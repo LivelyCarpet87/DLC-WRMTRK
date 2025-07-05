@@ -13,10 +13,12 @@
   "dependencies": {
     "@mantine/core": "^8.0.0",
     "@mantine/hooks": "^8.0.0",
+    "@types/uuid": "^10.0.0",
     "next": "^15.1.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-preset-mantine": "^2.1.0",
+    "types": "^0.1.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

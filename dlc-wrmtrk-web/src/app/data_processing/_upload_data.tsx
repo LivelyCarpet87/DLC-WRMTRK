@@ -12,7 +12,7 @@ import {
   Divider,
   Notification,
 } from "@mantine/core";
-import { UUID } from "crypto";
+import { UUID } from "node:crypto";
 import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -147,10 +147,10 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel}:{onDelete:(uui
     setWarnMsg("");
   }
 
-  let notifications = []
+  let notifications = [] as React.JSX.Element[]
   if (warnMsg != ""){
     notifications.push(
-    <Notification color="yellow" title="Warning!" onClose={ () => {setWarnMsg("");} } className="w-104"> 
+      <Notification key="warning" color="yellow" title="Warning!" onClose={ () => {setWarnMsg("");} } className="w-104"> 
         {warnMsg}
       </Notification>
     )
