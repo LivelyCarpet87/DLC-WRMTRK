@@ -1,8 +1,5 @@
 import { ColorSchemesSwitcher } from "@/components/color-schemes-switcher";
 import {
-  AppShell,
-  AppShellHeader,
-  AppShellMain,
   Group,
   Text,
   Title,
@@ -11,19 +8,7 @@ import Image from "next/image";
 
 export default function Home() {
   return (
-    <AppShell header={{ height: 60 }} padding="md">
-      <AppShellHeader>
-        <Group className="h-full px-md">
-          <Image
-            className="dark:invert"
-            src="https://nextjs.org/icons/next.svg"
-            alt="logo"
-            width={100}
-            height={100}
-          />
-        </Group>
-      </AppShellHeader>
-      <AppShellMain>
+      <div>
         <Title className="text-center mt-20">
           Welcome to{" "}
           <Text
@@ -59,7 +44,6 @@ export default function Home() {
         <div className="flex justify-center mt-10">
           <ColorSchemesSwitcher />
         </div>
-      </AppShellMain>
-    </AppShell>
+      </div>
   );
 }

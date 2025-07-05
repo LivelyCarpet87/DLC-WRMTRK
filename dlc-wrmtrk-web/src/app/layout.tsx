@@ -3,6 +3,10 @@ import {
   ColorSchemeScript,
   mantineHtmlProps,
   MantineProvider,
+  AppShell,
+  AppShellHeader,
+  AppShellMain,
+  Group,
 } from "@mantine/core";
 import theme from "./theme";
 import "./globals.css";
@@ -23,7 +27,17 @@ export default function RootLayout({
         <ColorSchemeScript />
       </head>
       <body className="antialiased">
-        <MantineProvider theme={theme}>{children}</MantineProvider>
+        <MantineProvider theme={theme}>
+          <AppShell header={{ height: 60 }} padding="md">
+            <AppShellHeader>
+              <Group className="h-full px-md">
+              </Group>
+            </AppShellHeader>
+            <AppShellMain>
+              {children}
+            </AppShellMain>
+          </AppShell>
+        </MantineProvider>
       </body>
     </html>
   );
