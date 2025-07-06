@@ -17,6 +17,7 @@
     "next": "^15.1.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "swr": "^2.3.4",
     "tailwind-preset-mantine": "^2.1.0",
     "types": "^0.1.1",
     "uuid": "^11.1.0"

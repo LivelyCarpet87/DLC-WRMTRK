@@ -15,6 +15,7 @@ import {
 import { UUID } from "node:crypto";
 import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import useSWR, { Fetcher } from 'swr';
 
 function VideoUploadTile(
   {onDelete, onChange, uuid, file, num}:
@@ -71,6 +72,9 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel}:{onDelete:(uui
   const [normImg, setNormImg] = useState(null as null|File);
   const [conditions, setConditions] = useState([] as string[]);
   const [warnMsg, setWarnMsg] = useState("");
+
+  const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
+  const conditionTagsSwr = useSWR(`/api/conditionTags`, fetcher);
 
   function addVideoTile() {
     let newVideoTiles = [... videoTiles];
@@ -177,7 +181,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel}:{onDelete:(uui
       <MultiSelect
         className="w-104"
         label="Conditions"
-        data={['L440', 'Q37', 'GLP']}
+        data={conditionTagsSwr.data}
         value={conditions}
         onChange={setConditions}
       />
@@ -209,6 +213,10 @@ export function UploadData(){
     const [primaryLabel, setPrimaryLabel] = useState(null as null|string);
     const [secondaryLabel, setSecondaryLabel] = useState(null as null|string);
 
+    const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
+    const primaryLabelsSwr = useSWR(`/api/primaryLabels`, fetcher);
+    const secondaryLabelsSwr = useSWR(`/api/secondaryLabels`, fetcher);
+
     function addPlate() {
       let newPlates = [... plates];
       const key = uuidv4() as UUID;
@@ -229,13 +237,13 @@ export function UploadData(){
             <Select
               className="w-40"
               placeholder="Primary Label"
-              data={['Section 72', 'Section 73', 'Section 74', 'Section 75']}
+              data={primaryLabelsSwr.data}
               onChange={setPrimaryLabel}
             />
             <Select
               className="w-40"
               placeholder="Secondary Label"
-              data={['Team 1', 'Team 2', 'Team 3', 'Team 4', 'Team 5', 'Team 6']}
+              data={secondaryLabelsSwr.data}
               onChange={setSecondaryLabel}
             />
           </div>
