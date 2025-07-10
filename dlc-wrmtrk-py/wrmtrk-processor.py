@@ -7,6 +7,8 @@ import numpy as np
 STEP_SIZE = 5
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
+SHUFFLE=10
+DLC_CFG_PAATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
 
 def acquire_video_job():
     vidQ = None
@@ -31,13 +33,12 @@ def acquire_video_job():
     return vidQ # vidMD5, numInd  = vidQ
 
 def dlc_track_data_generation(vidMD5, numInd):
-    dlc_config_path = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
     video_path = os.path.abspath(f"../data/ingest/videos/{vidMD5}.mp4")
-    dlc.analyze_videos(dlc_config_path, [video_path], videotype='.mp4', save_as_csv=True,
-        shuffle=10, destfolder='../data/intermediates', n_tracks=numInd)
+    dlc.analyze_videos(DLC_CFG_PAATH, [video_path], videotype='.mp4', save_as_csv=True,
+        shuffle=SHUFFLE, destfolder='../data/intermediates', n_tracks=numInd)
     
-    dlc.create_labeled_video(dlc_config_path, [video_path], videotype='mp4', 
-                            shuffle=10, fastmode=True, displayedbodyparts='all', 
+    dlc.create_labeled_video(DLC_CFG_PAATH, [video_path], videotype='mp4', 
+                            shuffle=SHUFFLE, fastmode=True, displayedbodyparts='all', 
                             displayedindividuals='all', codec='mp4v', 
                             destfolder=os.path.abspath(f"../data/intermediates"), draw_skeleton=False, color_by='bodypart', track_method='box')
 
