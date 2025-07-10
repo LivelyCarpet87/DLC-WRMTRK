@@ -38,6 +38,3 @@ next-env.d.ts
 # Miniconda
 dlc-wrmtrk-py/Miniconda3-latest-Linux-x86_64.sh
 dlc-wrmtrk-py/miniconda3
-
-# Data stores
-data
