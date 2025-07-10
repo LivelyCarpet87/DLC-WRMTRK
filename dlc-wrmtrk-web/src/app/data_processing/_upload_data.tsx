@@ -13,7 +13,7 @@ import {
   Notification,
 } from "@mantine/core";
 import { UUID } from "node:crypto";
-import { useState } from 'react';
+import { MutableRefObject, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import useSWR, { Fetcher } from 'swr';
 
@@ -65,7 +65,7 @@ function VideoUploadTile(
   );
 }
 
-function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel}:{onDelete:(uuid:UUID)=>void, uuid:UUID, primaryLabel:string|null, secondaryLabel:string|null}){
+function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCounter}:{onDelete:(uuid:UUID)=>void, uuid:UUID, primaryLabel:string|null, secondaryLabel:string|null, submissionCounter: MutableRefObject<number>}){
   const [videoTiles, setVideoTiles] = useState([] as UUID[]);
   const [videos, setVideos] = useState(new Map() as Map<UUID,{video:null|File,numInd:undefined|number}>);
   const [plateID, setPlateID] = useState("");
@@ -99,7 +99,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel}:{onDelete:(uui
     setVideos(newVideos);
   }
 
-  function submitPlate(){
+  async function submitPlate(){
     console.log("Submitting Plate.");
     console.log(primaryLabel, secondaryLabel, plateID, normImg,conditions, videos);
     if (primaryLabel == null){
@@ -130,9 +130,10 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel}:{onDelete:(uui
       } 
       */
     for (let ind in videoTiles) {
-      if (videos.get(videoTiles[ind]) === undefined) {
+      let vid_uuid = videoTiles[ind];
+      if (videos.get(vid_uuid) === undefined) {
         console.warn("FOUND UUID NOT DEFINED IN MAP");
-        console.log(uuid, videos);
+        console.log(vid_uuid, videos);
         return;
       } else if (videos.get(videoTiles[ind])!.video == null) {
         setWarnMsg("Video file has not been provided for a specific entry. The plate was not submitted for processing.");
@@ -140,8 +141,8 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel}:{onDelete:(uui
       } else if (videos.get(videoTiles[ind])!.video!.type != "video/mp4") {
         setWarnMsg("Video file provided for a specific entry was not an MP4 file. The plate was not submitted for processing.");
         return;
-      } else if (videos.get(videoTiles[ind])!.video!.size >= 8000000) {
-        setWarnMsg("Video file provided for a specific entry exceeded the max size of 8MB. The plate was not submitted for processing.");
+      } else if (videos.get(videoTiles[ind])!.video!.size >= 16000000) {
+        setWarnMsg("Video file provided for a specific entry exceeded the max size of 16MB. The plate was not submitted for processing.");
         return;
       } else if (videos.get(videoTiles[ind])!.numInd == undefined || videos.get(videoTiles[ind])!.numInd == 0) {
         setWarnMsg("Total Number of Individuals has not been provided for a specific entry. The plate was not submitted for processing.");
@@ -149,6 +150,48 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel}:{onDelete:(uui
       }
     }
     setWarnMsg("");
+
+    const plateFormData = new FormData();
+    plateFormData.append('uuid', uuid);
+    plateFormData.append('action', "SUBMIT");
+    plateFormData.append('primaryLabel', primaryLabel);
+    plateFormData.append('secondaryLabel', secondaryLabel);
+    plateFormData.append('plateID', plateID);
+    plateFormData.append('normImg', normImg);
+    plateFormData.append('conditions', JSON.stringify(conditions));
+
+    const plateSubmitResponse = await fetch('/api/plates', {
+        method: 'POST',
+        body: plateFormData
+    });
+
+    for (let ind in videoTiles) {
+      let vid_uuid = videoTiles[ind];
+      if (videos.get(vid_uuid) === undefined) {
+        console.warn("FOUND UUID NOT DEFINED IN MAP");
+        console.log(uuid, videos);
+        continue;
+      }
+      const formData = new FormData();
+      formData.append('plate_uuid', uuid);
+      formData.append('action', "SUBMIT");
+      formData.append('vid_file', videos.get(vid_uuid)!.video as Blob);
+      formData.append('num_ind', videos.get(vid_uuid)!.numInd!.toString());
+
+      const response = await fetch('/api/videos', {
+          method: 'POST',
+          body: formData
+      });
+    }
+
+    const body = await plateSubmitResponse.json() as { status: 'ok' | 'fail', message: string };
+
+    if (body.status === 'ok') {
+        submissionCounter.current += 1;
+    } else {
+        console.log("Plate submission failed.", body);
+    }
+
   }
 
   let notifications = [] as React.JSX.Element[]
@@ -208,14 +251,8 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel}:{onDelete:(uui
   )
 }
 
-export function UploadData(){
+export function UploadData({primaryLabel, secondaryLabel, submissionCounter}:{primaryLabel:string|null, secondaryLabel:string|null,submissionCounter: MutableRefObject<number>}){
     const [plates, setPlates] = useState([] as UUID[]);
-    const [primaryLabel, setPrimaryLabel] = useState(null as null|string);
-    const [secondaryLabel, setSecondaryLabel] = useState(null as null|string);
-
-    const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
-    const primaryLabelsSwr = useSWR(`/api/primaryLabels`, fetcher);
-    const secondaryLabelsSwr = useSWR(`/api/secondaryLabels`, fetcher);
 
     function addPlate() {
       let newPlates = [... plates];
@@ -233,23 +270,8 @@ export function UploadData(){
         <div className="flex flex-col justify-start items-center gap-5">
           <Title>Upload Data</Title>
 
-          <div className="bg-slate-100 rounded-md p-3 flex flex-row gap-3 w-112">
-            <Select
-              className="w-40"
-              placeholder="Primary Label"
-              data={primaryLabelsSwr.data}
-              onChange={setPrimaryLabel}
-            />
-            <Select
-              className="w-40"
-              placeholder="Secondary Label"
-              data={secondaryLabelsSwr.data}
-              onChange={setSecondaryLabel}
-            />
-          </div>
-          
           {plates.map( uuid => (
-              <PlateTile key={uuid} onDelete={deletePlate} uuid={uuid} primaryLabel={primaryLabel} secondaryLabel={secondaryLabel}></PlateTile>
+              <PlateTile key={uuid} onDelete={deletePlate} uuid={uuid} primaryLabel={primaryLabel} secondaryLabel={secondaryLabel} submissionCounter={submissionCounter}></PlateTile>
             )
           )}
 
