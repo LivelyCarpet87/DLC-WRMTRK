@@ -1,7 +1,5 @@
 "use client"
 import {
-  Text,
-  Select,
   Title,
   TextInput,
   MultiSelect,
@@ -73,28 +71,29 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
   const [conditions, setConditions] = useState([] as string[]);
   const [warnMsg, setWarnMsg] = useState("");
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
   const conditionTagsSwr = useSWR(`/api/conditionTags`, fetcher);
 
   function addVideoTile() {
-    let newVideoTiles = [... videoTiles];
+    const newVideoTiles = [... videoTiles];
     const key = uuidv4() as UUID;
     newVideoTiles.push(key);
     setVideoTiles(newVideoTiles);
-    let newVideos = new Map(videos);
+    const newVideos = new Map(videos);
     newVideos.set(key, {video:null,numInd:undefined});
     setVideos(newVideos);
   }
 
   function deleteVideoTile(uuid:UUID) {
     setVideoTiles(videoTiles.filter( key => key != uuid));
-    let newVideos = new Map(videos);
+    const newVideos = new Map(videos);
     newVideos.delete(uuid);
     setVideos(newVideos);
   }
 
   function onVideoTileChange(uuid:UUID, videoFile:null|File, numInd:undefined|number){
-    let newVideos = new Map(videos);
+    const newVideos = new Map(videos);
     newVideos.set(uuid, {video:videoFile,numInd:numInd});
     setVideos(newVideos);
   }
@@ -129,8 +128,8 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
         console.log('Condition Tags not provided.');
       } 
       */
-    for (let ind in videoTiles) {
-      let vid_uuid = videoTiles[ind];
+    for (const ind in videoTiles) {
+      const vid_uuid = videoTiles[ind];
       if (videos.get(vid_uuid) === undefined) {
         console.warn("FOUND UUID NOT DEFINED IN MAP");
         console.log(vid_uuid, videos);
@@ -165,8 +164,8 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
         body: plateFormData
     });
 
-    for (let ind in videoTiles) {
-      let vid_uuid = videoTiles[ind];
+    for (const ind in videoTiles) {
+      const vid_uuid = videoTiles[ind];
       if (videos.get(vid_uuid) === undefined) {
         console.warn("FOUND UUID NOT DEFINED IN MAP");
         console.log(uuid, videos);
@@ -178,7 +177,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
       formData.append('vid_file', videos.get(vid_uuid)!.video as Blob);
       formData.append('num_ind', videos.get(vid_uuid)!.numInd!.toString());
 
-      const response = await fetch('/api/videos', {
+      await fetch('/api/videos', {
           method: 'POST',
           body: formData
       });
@@ -194,7 +193,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
 
   }
 
-  let notifications = [] as React.JSX.Element[]
+  const notifications = [] as React.JSX.Element[]
   if (warnMsg != ""){
     notifications.push(
       <Notification key="warning" color="yellow" title="Warning!" onClose={ () => {setWarnMsg("");} } className="w-104"> 
@@ -255,7 +254,7 @@ export function UploadData({primaryLabel, secondaryLabel, submissionCounter}:{pr
     const [plates, setPlates] = useState([] as UUID[]);
 
     function addPlate() {
-      let newPlates = [... plates];
+      const newPlates = [... plates];
       const key = uuidv4() as UUID;
       newPlates.push(key);
       setPlates(newPlates);

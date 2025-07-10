@@ -1,12 +1,11 @@
 import fs from "fs"
 import path from "path"
-import { NextResponse } from "next/server";
 
 export async function GET(request: Request, { params }: { params: Promise<{ file: string }>} ) {
     const {file} = await params;
     try {
-        let safeSuffix = path.normalize(`${file}`).replace(/^(\.\.(\/|\\|$))+/, '');
-        let filePath = path.join('../data/outputs', safeSuffix);
+        const safeSuffix = path.normalize(`${file}`).replace(/^(\.\.(\/|\\|$))+/, '');
+        const filePath = path.join('../data/outputs', safeSuffix);
         console.log(filePath);
     if (fs.existsSync(filePath)) {
         const fileBuffer = fs.readFileSync(filePath) // Synchronously read the file into a buffer

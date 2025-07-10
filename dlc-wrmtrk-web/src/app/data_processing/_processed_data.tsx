@@ -1,14 +1,12 @@
 "use client"
 
-import { Title, Select, Button, CopyButton, Table, Loader, Skeleton, Pill } from "@mantine/core";
+import { Title, Button, CopyButton, Table, Loader, Skeleton, Pill } from "@mantine/core";
 import { UUID } from "crypto";
-import { useRouter } from "next/navigation";
-import { MutableRefObject, useRef, useState } from "react";
-import useSWR, { Fetcher } from "swr";
+import { MutableRefObject, useRef } from "react";
+import useSWR from "swr";
 
 
 function VideoTile({md5}:{md5:string}){
-    const router = useRouter();
     const pauseRef = useRef(false);
     const fetchWithToken = async (url:string, md5:string) => {
         const plateFormData = new FormData();
@@ -72,9 +70,9 @@ function VideoTile({md5}:{md5:string}){
 
     let dataDisplay = <></>;
     if (proc_state == "done" || proc_state == "warning"){
-        let tableRows = [] as React.JSX.Element[];
-        for (let i in videoSWR.data.displayData.table){
-            let row = videoSWR.data.displayData.table[i];
+        const tableRows = [] as React.JSX.Element[];
+        for (const i in videoSWR.data.displayData.table){
+            const row = videoSWR.data.displayData.table[i];
             tableRows.push(
                 <Table.Tr key={row.ind}>
                     <Table.Td>{row.ind}</Table.Td>
@@ -167,13 +165,13 @@ function PlateTile({uuid}:{uuid:UUID}){
         );
     }
 
-    let condTags = [] as React.JSX.Element[];
-    for (let i in plateSWR.data!.conditionTags) {
+    const condTags = [] as React.JSX.Element[];
+    for (const i in plateSWR.data!.conditionTags) {
         condTags.push(<Pill key={plateSWR.data!.conditionTags[i]} className="bg-slate-300">{plateSWR.data!.conditionTags[i]}</Pill>);
     }
 
-    let videoTiles = [] as React.JSX.Element[]
-    for (let i in plateSWR.data!.videoMD5s) {
+    const videoTiles = [] as React.JSX.Element[]
+    for (const i in plateSWR.data!.videoMD5s) {
         videoTiles.push(<VideoTile key={plateSWR.data!.videoMD5s[i]} md5={plateSWR.data!.videoMD5s[i]} />);
     }
 
@@ -202,11 +200,12 @@ export function ProcessedData({primaryLabel, secondaryLabel, submissionCounter}:
         }).then(response => response.json());
     }
     console.log(submissionCounter.current);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const platesSWR = useSWR( (primaryLabel && secondaryLabel) ? ['/api/plates', primaryLabel,secondaryLabel, submissionCounter.current] : null, ([url, primaryLabel,secondaryLabel, submissionCounterCur]) => fetchWithToken(url, primaryLabel!,secondaryLabel!), { keepPreviousData: true });
 
-    let plateTiles = [] as React.JSX.Element[];
+    const plateTiles = [] as React.JSX.Element[];
     if (platesSWR.data){
-        for (let i in platesSWR.data){
+        for (const i in platesSWR.data){
             plateTiles.push(<PlateTile key={platesSWR.data[i]} uuid={platesSWR.data[i]} />)
         }
     }

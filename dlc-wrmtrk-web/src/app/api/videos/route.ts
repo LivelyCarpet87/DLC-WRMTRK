@@ -46,9 +46,9 @@ export async function POST(request: Request) {
         if (proc_state == "done" || proc_state == "warning"){
             const dataQ = db.prepare('SELECT ind, speed, confidence FROM detectedIndv WHERE vidMD5 = ?').all(videoMD5);
             let tsv = "";
-            let table = [] as {ind:string, speed:number, confidence:boolean}[]
+            const table = [] as {ind:string, speed:number, confidence:boolean}[]
 
-            for (let i in dataQ) {
+            for (const i in dataQ) {
                 const row = dataQ[i];
                 table.push({ind:row.ind, speed:row.speed, confidence:row.confidence==1})
                 if(row.confidence==1){

@@ -1,9 +1,10 @@
 "use client"
-import { Divider, Select, TagsInput } from "@mantine/core";
+import {TagsInput } from "@mantine/core";
 import useSWR, { Fetcher } from "swr";
 
 
 export default function ExperimentManagement() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
   const primaryLabelsSwr = useSWR(`/api/primaryLabels`, fetcher);
   const secondaryLabelsSwr = useSWR(`/api/secondaryLabels`, fetcher);

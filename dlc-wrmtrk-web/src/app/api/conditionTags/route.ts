@@ -1,5 +1,6 @@
 import { db } from "../../../../utils";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(request: Request) {
     const conditionTagQ = db.prepare('SELECT conditionTag FROM conditionTagPool').all();
     const conditionTags = conditionTagQ ? conditionTagQ.map( (row:{conditionTag:string})=>row.conditionTag ) : [];

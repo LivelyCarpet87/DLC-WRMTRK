@@ -1,5 +1,6 @@
 import { db } from "../../../../utils";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(request: Request) {
     const secondaryLabelQ = db.prepare('SELECT secondaryLabel FROM secondaryLabelPool').all();
     const secondaryLabels = secondaryLabelQ ? secondaryLabelQ.map( (row:{secondaryLabel:string})=>row.secondaryLabel ) : [];

@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 export default function DataProcessing() {
   const [primaryLabel, setPrimaryLabel] = useState(null as null|string);
   const [secondaryLabel, setSecondaryLabel] = useState(null as null|string);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
   const primaryLabelsSwr = useSWR(`/api/primaryLabels`, fetcher);
   const secondaryLabelsSwr = useSWR(`/api/secondaryLabels`, fetcher);

@@ -1,5 +1,6 @@
 import { db } from "../../../../utils";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(request: Request) {
     const primaryLabelQ = db.prepare('SELECT primaryLabel FROM primaryLabelPool').all();
     const primaryLabels = primaryLabelQ ? primaryLabelQ.map( (row:{primaryLabel:string})=>row.primaryLabel ) : [];
