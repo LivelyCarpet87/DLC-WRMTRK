@@ -10,24 +10,7 @@ export default function Home() {
   return (
       <div>
         <Title className="text-center mt-20">
-          Welcome to{" "}
-          <Text
-            inherit
-            variant="gradient"
-            component="span"
-            gradient={{ from: "pink", to: "yellow" }}
-          >
-            Mantine
-          </Text>{" "}
-          +
-          <Text
-            inherit
-            variant="gradient"
-            component="span"
-            gradient={{ from: "blue", to: "green" }}
-          >
-            TailwindCSS
-          </Text>
+          Welcome to DLC WRMTRK Web Interface
         </Title>
         <Text
           className="text-center text-gray-700 dark:text-gray-300 max-w-[500px] mx-auto mt-xl"
@@ -37,13 +20,8 @@ export default function Home() {
           mx="auto"
           mt="xl"
         >
-          This starter Next.js project includes a minimal setup for Mantine with
-          TailwindCSS. To get started edit page.tsx file.
+          Go to Data Processing to upload videos for processing and review processed results. Go to Experiment Management to manage experiment labels and condition tags.
         </Text>
-
-        <div className="flex justify-center mt-10">
-          <ColorSchemesSwitcher />
-        </div>
       </div>
   );
 }
