@@ -1,7 +1,7 @@
 import { db } from "../../../../utils";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function GET(request: Request) {
+export function GET(request: Request) {
     db.pragma('journal_mode = WAL');
     db.prepare("CREATE TABLE IF NOT EXISTS primaryLabelPool (primaryLabel TEXT UNIQUE);").run();
     db.prepare("CREATE TABLE IF NOT EXISTS secondaryLabelPool (secondaryLabel TEXT UNIQUE);").run();
