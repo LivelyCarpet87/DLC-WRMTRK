@@ -21,7 +21,7 @@ function VideoTile({md5}:{md5:string}){
         return pauseRef.current
     }
     const videoSWR = useSWR( ['/api/videos', md5], ([url, md5]) => fetchWithToken(url, md5),{ refreshInterval: 10000, keepPreviousData: true, isPaused: ifPause});
-    if (videoSWR.data === undefined && videoSWR.isLoading || videoSWR.isValidating) {
+    if (videoSWR.data === undefined && (videoSWR.isLoading || videoSWR.isValidating)) {
         return (
             <div className="bg-slate-100 rounded-md p-3 flex flex-col gap-4 w-80">
                 <>
@@ -142,9 +142,9 @@ function PlateTile({uuid}:{uuid:UUID}){
             body: plateFormData
         }).then(response => response.json());
     }
-    const plateSWR = useSWR( ['/api/plates', uuid], ([url, uuid]) => fetchWithToken(url, uuid), { keepPreviousData: true});
+    const plateSWR = useSWR( ['/api/plates', uuid], ([url, uuid]) => fetchWithToken(url, uuid), { refreshInterval: 1000, keepPreviousData: true});
     
-    if (plateSWR.data === undefined && plateSWR.isLoading || plateSWR.isValidating) {
+    if (plateSWR.data === undefined && (plateSWR.isLoading || plateSWR.isValidating)) {
         return (
         <div className="bg-slate-100 rounded-md p-3 flex flex-col gap-4 w-112">
             <div className="flex flex-row gap-4 w-104 items-center justify-between">
@@ -201,7 +201,7 @@ export function ProcessedData({primaryLabel, secondaryLabel, submissionCounter}:
     }
     console.log(submissionCounter.current);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const platesSWR = useSWR( (primaryLabel && secondaryLabel) ? ['/api/plates', primaryLabel,secondaryLabel, submissionCounter.current] : null, ([url, primaryLabel,secondaryLabel, submissionCounterCur]) => fetchWithToken(url, primaryLabel!,secondaryLabel!), { keepPreviousData: true });
+    const platesSWR = useSWR( (primaryLabel && secondaryLabel) ? ['/api/plates', primaryLabel,secondaryLabel, submissionCounter.current] : null, ([url, primaryLabel,secondaryLabel, submissionCounterCur]) => fetchWithToken(url, primaryLabel!,secondaryLabel!), { refreshInterval: 1000, keepPreviousData: true });
 
     const plateTiles = [] as React.JSX.Element[];
     if (platesSWR.data){
