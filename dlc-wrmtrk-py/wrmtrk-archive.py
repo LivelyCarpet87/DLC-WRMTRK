@@ -46,12 +46,14 @@ for plate_entry in platesQ:
     arc_con.commit()
     src_con.commit()
     
-    normVal = src_cur.execute("SELECT value FROM normalization WHERE normMD5 = ?", [normMD5]).fetchone()[0]
-    arc_cur.execute("INSERT INTO normalization(normMD5, value) VALUES(?, ?)", [normMD5, normVal])
-    arc_con.commit()
-    src_cur.execute("DELETE FROM normalization WHERE normMD5 = ?", [normMD5])
-    src_con.commit()
-    shutil.copyfile(f'../data/ingest/normalizingImages/{normMD5}.png',f'../data/archives/{archive_id}/normalizingImages/{normMD5}.png')
+    normValQ = src_cur.execute("SELECT value FROM normalization WHERE normMD5 = ?", [normMD5]).fetchone()
+    if normValQ:
+        normVal = normValQ[0]
+        arc_cur.execute("INSERT INTO normalization(normMD5, value) VALUES(?, ?)", [normMD5, normVal])
+        arc_con.commit()
+        src_cur.execute("DELETE FROM normalization WHERE normMD5 = ?", [normMD5])
+        src_con.commit()
+        shutil.copyfile(f'../data/ingest/normalizingImages/{normMD5}.png',f'../data/archives/{archive_id}/normalizingImages/{normMD5}.png')
 
     videosQ = src_cur.execute("SELECT vidMD5, filename, proc_state, numInd, uploadTime FROM videos WHERE plateUUID = ?", [plateUUID]).fetchall()
 
