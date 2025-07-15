@@ -1,4 +1,4 @@
-import glob
+#!/usr/bin/python3
 import math
 import sqlite3, os
 import deeplabcut as dlc
