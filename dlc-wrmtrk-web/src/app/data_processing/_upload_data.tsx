@@ -9,11 +9,13 @@ import {
   ActionIcon,
   Divider,
   Notification,
+  Tooltip,
 } from "@mantine/core";
 import { UUID } from "node:crypto";
 import { MutableRefObject, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import useSWR, { Fetcher } from 'swr';
+import { useFocusTrap, useHotkeys } from "@mantine/hooks";
 
 function VideoUploadTile(
   {onDelete, onChange, uuid, file, num}:
@@ -42,23 +44,27 @@ function VideoUploadTile(
           placeholder="Select Video (.mp4)"
           value={videoFile}
           onChange={onVideoFileChange}
+          ref={useFocusTrap(videoFile == null)}
         />
-        <NumberInput
-          className="w-26"
-          label="Total ind count"
-          placeholder="Ind Count"
-          min={1}
-          max={10}
-          value={numInd}
-          onChange={onNumIndChange}
-        />
-        
+        <Tooltip label="Total # of individuals that appear in video." openDelay={700}>
+          <NumberInput
+            className="w-26"
+            label="Total ind count"
+            placeholder="Ind Count"
+            min={1}
+            max={10}
+            value={numInd}
+            onChange={onNumIndChange}
+          />
+        </Tooltip>
       </div>
-      <ActionIcon variant="transparent" aria-label="Settings" className="size-9 -m-2" onClick={() => onDelete(uuid) }>
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6 text-red-700">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-        </svg>
-      </ActionIcon>
+      <Tooltip label="Remove this video entry from plate." openDelay={700}>
+        <ActionIcon variant="transparent" aria-label="Settings" className="size-9 -m-2" onClick={() => onDelete(uuid) }>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6 text-red-700">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+        </ActionIcon>
+      </Tooltip>
     </div>
   );
 }
@@ -211,6 +217,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
           placeholder="Plate ID"
           value={plateID}
           onChange={(event) => setPlateID(event.currentTarget.value)}
+          ref={useFocusTrap(plateID === "")}
         />
         <FileInput
           className="w-60"
@@ -239,12 +246,16 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
       {notifications}
 
       <div className="grid grid-cols-2 gap-4">
-        <Button className="bg-green-700" onClick={submitPlate}>
-          Submit Plate
-        </Button>
-        <Button className="bg-red-700" onClick={() => onDelete(uuid) }>
-          Delete Plate
-        </Button>
+        <Tooltip label="Can resubmit to update information." openDelay={700}>
+          <Button className="bg-green-700" onClick={submitPlate}>
+            Submit For Processing
+          </Button>
+        </Tooltip>
+        <Tooltip label="This does not delete submitted data." openDelay={700}>
+          <Button className="bg-red-700" onClick={() => onDelete(uuid) }>
+            Delete Plate Locally
+          </Button>
+        </Tooltip>
       </div>
     </div>
   )
@@ -265,6 +276,8 @@ export function UploadData({primaryLabel, secondaryLabel, submissionCounter}:{pr
       setPlates(plates.filter( key => key != uuid));
     }
 
+    useHotkeys([['ctrl+K', () => addPlate()]]);
+
     return (
         <div className="flex flex-col justify-start items-center gap-5">
           <Title>Upload Data</Title>
@@ -274,9 +287,11 @@ export function UploadData({primaryLabel, secondaryLabel, submissionCounter}:{pr
             )
           )}
 
-          <Button variant="outline" onClick={addPlate} className="w-114">
-            + Add Plate
-          </Button>
+          <Tooltip label="Create another form for another plate. Hotkey: CTRL+K" openDelay={700}>
+            <Button variant="outline" onClick={addPlate} className="w-114">
+              + Add Plate
+            </Button>
+          </Tooltip>
       </div>
     );
 }
