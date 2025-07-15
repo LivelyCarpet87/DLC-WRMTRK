@@ -11,8 +11,8 @@ export default function DataProcessing() {
   const [secondaryLabel, setSecondaryLabel] = useState(null as null|string);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
-  const primaryLabelsSwr = useSWR(`/api/primaryLabels`, fetcher);
-  const secondaryLabelsSwr = useSWR(`/api/secondaryLabels`, fetcher);
+  const primaryLabelsSwr = useSWR(`/api/primaryLabels`, fetcher, {refreshInterval: 1000, });
+  const secondaryLabelsSwr = useSWR(`/api/secondaryLabels`, fetcher, {refreshInterval: 1000, });
   const submissionCounter = useRef(0);
 
   return (
