@@ -219,13 +219,15 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
           onChange={(event) => setPlateID(event.currentTarget.value)}
           ref={useFocusTrap(plateID === "")}
         />
-        <FileInput
-          className="w-60"
-          label="Normalization Image"
-          placeholder="Select Normalization Image"
-          value={normImg}
-          onChange={setNormImg}
-        />
+        <Tooltip label="Image to convert pixels to distance." openDelay={700}>
+          <FileInput
+            className="w-60"
+            label="Normalization Image"
+            placeholder="Select Normalization Image"
+            value={normImg}
+            onChange={setNormImg}
+          />
+        </Tooltip>
       </div>
       <MultiSelect
         className="w-104"
