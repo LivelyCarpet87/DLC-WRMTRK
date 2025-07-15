@@ -204,14 +204,14 @@ def track_data_processing(vidMD5):
         speed = np.nanmean(np.array(data))/STEP_SIZE
         if np.isnan(speed):
             raise ValueError
-        elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.60:
+        elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.50:
             raise ValueError
         elif len(data) < len(range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE))/8:
             raise ValueError
         confidence = True
         if np.isnan(np.array(data)).sum() > len(data)/4 or len(data) < len(range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE))/2:
             confidence = False
-        elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.80:
+        elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.70:
             confidence = False
         speed_data.append( (indv,speed,confidence) )
     
