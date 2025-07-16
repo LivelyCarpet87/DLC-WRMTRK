@@ -8,7 +8,13 @@ STEP_SIZE = 5
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
 SHUFFLE=10
-DLC_CFG_PAATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
+DLC_CFG_PATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
+
+con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
+cur = con.cursor()
+cur.execute('UPDATE videos SET proc_state = "pending" WHERE proc_state = "processing"')
+con.commit()
+con.close()
 
 def acquire_video_job():
     vidQ = None
@@ -34,10 +40,10 @@ def acquire_video_job():
 
 def dlc_track_data_generation(vidMD5, numInd):
     video_path = os.path.abspath(f"../data/ingest/videos/{vidMD5}.mp4")
-    dlc.analyze_videos(DLC_CFG_PAATH, [video_path], videotype='.mp4', save_as_csv=True,
+    dlc.analyze_videos(DLC_CFG_PATH, [video_path], videotype='.mp4', save_as_csv=True,
         shuffle=SHUFFLE, destfolder='../data/intermediates', n_tracks=numInd)
     
-    dlc.create_labeled_video(DLC_CFG_PAATH, [video_path], videotype='mp4', 
+    dlc.create_labeled_video(DLC_CFG_PATH, [video_path], videotype='mp4', 
                             shuffle=SHUFFLE, fastmode=True, displayedbodyparts='all', 
                             displayedindividuals='all', codec='mp4v', 
                             destfolder=os.path.abspath(f"../data/intermediates"), draw_skeleton=False, color_by='bodypart', track_method='box')
@@ -124,6 +130,7 @@ def track_data_processing(vidMD5):
 
     speed_data = []
     for indv in [f"ind{i}" for i in range(1,numInd+1)]:
+        # Calc len
         get_body_pos_never_null_query = '''
         SELECT
         head.x_pos         AS head_x,          head.y_pos         AS head_y,
@@ -151,15 +158,15 @@ def track_data_processing(vidMD5):
         head.y_pos IS NOT NULL AND head.y_pos = head.y_pos;
         '''
         points = [
-            ("head_x", "head_y"),
-            ("eighth_x", "eighth_y"),
-            ("quarter_x", "quarter_y"),
-            ("three_eighths_x", "three_eighths_y"),
-            ("half_x", "half_y"),
-            ("five_eighths_x", "five_eighths_y"),
-            ("three_quarters_x", "three_quarters_y"),
-            ("seven_eighths_x", "seven_eighths_y"),
-            ("tail_x", "tail_y")
+            "head",
+            "p18",
+            "p14",
+            "p38",
+            "p12",
+            "p58",
+            "p34",
+            "p78",
+            "tail"
         ]
         memCur.execute(get_body_pos_never_null_query, (indv,))
         rows = memCur.fetchall()
@@ -174,6 +181,56 @@ def track_data_processing(vidMD5):
             lengths.append(length)
         
         indv_len = np.median(lengths)
+
+        # unflip points
+        seg_len = indv_len / (len(points)-1)
+        for frame_ind in range(min_frame,max_frame):
+            for px in range(int(len(points)/2)):
+                p1 = points[px]
+                p2 = points[len(points)-px-1]
+                
+                p1t0Q = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p1, indv]).fetchone()
+                p2t0Q = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p2, indv]).fetchone()
+                p1t1Q = memCur.execute(f"SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p1, indv]).fetchone()
+                p2t1Q = memCur.execute(f"SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p2, indv]).fetchone()
+
+                if not (p1t0Q and p2t0Q and None not in p1t0Q and None not in p2t0Q):
+                    continue
+
+                p1t0_x, p1t0_y = p1t0Q
+                p2t0_x, p2t0_y = p2t0Q
+
+                if p1t1Q and p2t1Q and None not in p1t1Q and None not in p2t1Q:
+                    p1t1_x, p1t1_y, p1t1_conf = p1t1Q
+                    p2t1_x, p2t1_y, p2t1_conf = p2t1Q
+                    if (math.hypot(p1t0_x, p1t0_y, p1t1_x, p1t1_y) > 0.5 * seg_len) \
+                    and (math.hypot(p1t0_x, p1t0_y, p2t1_x, p2t1_y) < 0.5 * seg_len) \
+                    and (math.hypot(p2t0_x, p2t0_y, p2t1_x, p2t1_y) > 0.5 * seg_len) \
+                    and (math.hypot(p2t0_x, p2t0_y, p1t1_x, p1t1_y) < 0.5 * seg_len):
+                        memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2t1_x,p2t1_y,p2t1_conf,frame_ind+1, p1, indv])
+                        memCur.execute(f"UPDATE labels SET(x_pos, y_pos), confidence VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1t1_x,p1t1_y,p1t1_conf,frame_ind+1, p2, indv])
+                        memCon.commit()
+                        print("flipped")
+                elif p1t1Q and None not in p1t1Q:
+                    p1t1_x, p1t1_y, p1t1_conf = p1t1Q
+                    if (math.hypot(p1t0_x, p1t0_y, p1t1_x, p1t1_y) > 0.5 * seg_len) \
+                    and (math.hypot(p1t0_x, p1t0_y, p2t0_x, p2t0_y) > seg_len) \
+                    and (math.hypot(p2t0_x, p2t0_y, p1t1_x, p1t1_y) < 0.5 * seg_len):
+                        memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p1, indv])
+                        memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1t1_x,p1t1_y,p1t1_conf,frame_ind+1, p2, indv])
+                        memCon.commit()
+                        print("flipped")
+                elif p2t1Q and None not in p2t1Q:
+                    p2t1_x, p2t1_y, p2t1_conf = p2t1Q
+                    if (math.hypot(p2t0_x, p2t0_y, p2t1_x, p2t1_x) > 0.5 * seg_len) \
+                    and (math.hypot(p1t0_x, p1t0_y, p2t0_x, p2t0_y) > seg_len) \
+                    and (math.hypot(p1t0_x, p1t0_y, p2t1_x, p2t1_y) < 0.5 * seg_len):
+                        memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p2, indv])
+                        memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2t1_x,p2t1_y,p2t1_conf,frame_ind+1, p1, indv])
+                        memCon.commit()
+                        print("flipped")
+
+        #Calc speed
         data = []
         for frame_ind in range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE):
             entry = []
@@ -198,16 +255,20 @@ def track_data_processing(vidMD5):
                     distance = np.NaN
                 entry.append(distance)
             if np.isnan(np.array(entry)).sum() == len(entry):
-                break
+                if len(data) > len(range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE))/3 or len(data) > len(range(frame_ind+STEP_SIZE,max_frame+1,STEP_SIZE)):
+                    break
+                else:
+                    data = []
+                    continue
             data.append(entry)
         
         speed = np.nanmean(np.array(data))/STEP_SIZE
         if np.isnan(speed):
             raise ValueError
         elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.50:
-            raise ValueError
+            continue
         elif len(data) < len(range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE))/8:
-            raise ValueError
+            continue
         confidence = True
         if np.isnan(np.array(data)).sum() > len(data)/4 or len(data) < len(range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE))/2:
             confidence = False
@@ -215,14 +276,25 @@ def track_data_processing(vidMD5):
             confidence = False
         speed_data.append( (indv,speed,confidence) )
     
+    con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
+    cur = con.cursor()
+    intended_numIndv = cur.execute("SELECT numInd FROM videos WHERE vidMD5 = ?", [vidMD5]).fetchone()[0]
+    con.close()
+    if len(speed_data) == 0:
+        raise ValueError
+    elif len(speed_data) != intended_numIndv:
+        mark_warning(vidMD5)
+    else:
+        mark_complete(vidMD5)
+
+    con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
+    cur = con.cursor()
     for v in speed_data:
         indv,speed,confidence = v
-        con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
-        cur = con.cursor()
         cur.execute("INSERT OR REPLACE INTO detectedIndv(vidMD5, ind, speed, confidence) VALUES(?,?,?,?)",
                     [vidMD5,indv,speed,confidence])
-        con.commit()
-        con.close()
+    con.commit()
+    con.close()
 
 
 def mark_complete(vidMD5):
@@ -271,11 +343,6 @@ while True:
                     dlc_track_data_generation(vidMD5, numInd+1)
                 
                 track_data_processing(vidMD5)
-                if attempt == 0:
-                    mark_complete(vidMD5)
-                else:
-                    mark_warning(vidMD5)
-                break
             except ValueError:
                 print("detector failed")
                 cleanup(vidMD5)
