@@ -3,8 +3,9 @@ import math
 import sqlite3, os
 import deeplabcut as dlc
 import numpy as np
+import cv2
 
-STEP_SIZE = 5
+
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
 SHUFFLE=10
@@ -210,7 +211,6 @@ def track_data_processing(vidMD5):
                         memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2t1_x,p2t1_y,p2t1_conf,frame_ind+1, p1, indv])
                         memCur.execute(f"UPDATE labels SET(x_pos, y_pos), confidence VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1t1_x,p1t1_y,p1t1_conf,frame_ind+1, p2, indv])
                         memCon.commit()
-                        print("flipped")
                 elif p1t1Q and None not in p1t1Q:
                     p1t1_x, p1t1_y, p1t1_conf = p1t1Q
                     if (math.hypot(p1t0_x, p1t0_y, p1t1_x, p1t1_y) > 0.5 * seg_len) \
@@ -219,7 +219,6 @@ def track_data_processing(vidMD5):
                         memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p1, indv])
                         memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1t1_x,p1t1_y,p1t1_conf,frame_ind+1, p2, indv])
                         memCon.commit()
-                        print("flipped")
                 elif p2t1Q and None not in p2t1Q:
                     p2t1_x, p2t1_y, p2t1_conf = p2t1Q
                     if (math.hypot(p2t0_x, p2t0_y, p2t1_x, p2t1_x) > 0.5 * seg_len) \
@@ -228,16 +227,20 @@ def track_data_processing(vidMD5):
                         memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p2, indv])
                         memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2t1_x,p2t1_y,p2t1_conf,frame_ind+1, p1, indv])
                         memCon.commit()
-                        print("flipped")
 
         #Calc speed
+        video_path = os.path.abspath(f"../data/ingest/videos/{vidMD5}.mp4")
+        src_video = cv2.VideoCapture(video_path)
+        fps = src_video.get(cv2.CAP_PROP_FPS)
+        step_size = int(fps*0.2)+1
         data = []
-        for frame_ind in range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE):
+        tracklet = [0,-1,[]]
+        for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
             entry = []
             for bodypart in parts_list[1:-1]: # Ignore ends of the worms
                 x_pos_prev = np.NaN
                 y_pos_prev = np.NaN
-                prev_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-STEP_SIZE, indv, bodypart) ).fetchone()
+                prev_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
                 if prev_q is not None:
                     x_pos_prev = prev_q[0]
                     y_pos_prev = prev_q[1]
@@ -255,26 +258,31 @@ def track_data_processing(vidMD5):
                     distance = np.NaN
                 entry.append(distance)
             if np.isnan(np.array(entry)).sum() == len(entry):
-                if len(data) > len(range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE))/3 or len(data) > len(range(frame_ind+STEP_SIZE,max_frame+1,STEP_SIZE)):
-                    break
-                else:
-                    data = []
-                    continue
-            data.append(entry)
-        
-        speed = np.nanmean(np.array(data))/STEP_SIZE
+                tracklet[1] = frame_ind
+                data.append(tracklet)
+                tracklet = [frame_ind+1,-1,[]]
+            else:
+                tracklet[2].append(entry)
+        tracklet[1] = range(min_frame+step_size,max_frame+1,step_size)[-1]
+        data.append(tracklet)
+
+        longest_tracklet = max(data, key=lambda x: x[1]-x[0])
+
+        if len(longest_tracklet[2]) == 0:
+            raise ValueError
+        speed = np.nanmean(np.array(longest_tracklet[2]))/step_size*fps
         if np.isnan(speed):
             raise ValueError
         elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.50:
             continue
-        elif len(data) < len(range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE))/8:
+        elif len(longest_tracklet[2]) < len(range(min_frame+step_size,max_frame+1,step_size))/8:
             continue
         confidence = True
-        if np.isnan(np.array(data)).sum() > len(data)/4 or len(data) < len(range(min_frame+STEP_SIZE,max_frame+1,STEP_SIZE))/2:
+        if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < len(range(min_frame+step_size,max_frame+1,step_size))/2:
             confidence = False
         elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.70:
             confidence = False
-        speed_data.append( (indv,speed,confidence) )
+        speed_data.append( (indv,speed,confidence, longest_tracklet[0:2]) )
     
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
@@ -290,12 +298,47 @@ def track_data_processing(vidMD5):
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
     for v in speed_data:
-        indv,speed,confidence = v
+        indv,speed,confidence,_ = v
         cur.execute("INSERT OR REPLACE INTO detectedIndv(vidMD5, ind, speed, confidence) VALUES(?,?,?,?)",
                     [vidMD5,indv,speed,confidence])
     con.commit()
     con.close()
 
+    # Make labeled video
+    label_ind_bounds = []
+    for v in speed_data:
+        indv,_,_,bounds = v
+        label_ind_bounds.append([indv,bounds])
+    
+    out_video = cv2.VideoWriter(f'../data/outputs/{vidMD5}_labeled.mp4', 
+                                cv2.VideoWriter_fourcc(*'mp4v'), 
+                                fps / step_size, 
+                                (int(src_video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(src_video.get(cv2.CAP_PROP_FRAME_HEIGHT))))
+    frame_ind = 0
+    for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
+        src_video.set(cv2.CAP_PROP_POS_FRAMES, frame_ind)
+        ret, frame = src_video.read()
+        for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1],step_size),label_ind_bounds)]:
+            x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
+            x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
+            cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (0, 255, 0), 1)
+            cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1, cv2.LINE_AA)
+            parts_list = ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
+            for part in parts_list[1:-1]:
+                pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
+                if pointQ is not None:
+                    x0,y0 = pointQ
+                    cv2.circle(frame, (int(x0),int(y0)), 4, (0, 255, 0), -1)
+            for i in range(2,len(parts_list)-1):
+                pointQ1 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i-1]]).fetchone()
+                pointQ2 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i]]).fetchone()
+                if pointQ1 is not None and pointQ2 is not None:
+                    x0,y0 = pointQ1
+                    x1,y1 = pointQ2
+                    cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (0, 255, 0), 1)
+        out_video.write(frame)
+    src_video.release()
+    out_video.release()
 
 def mark_complete(vidMD5):
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
@@ -322,7 +365,7 @@ def cleanup(vidMD5):
     labeled_video_q = [entry for entry in os.listdir('../data/intermediates/') if entry.startswith(vidMD5) and entry.endswith('.mp4')]
     if len(labeled_video_q) > 0:
         labeled_video = labeled_video_q[0]
-        os.rename(f'../data/intermediates/{labeled_video}', f'../data/outputs/{vidMD5}_labeled.mp4')
+        os.rename(f'../data/intermediates/{labeled_video}', f'../data/outputs/{vidMD5}_prelabeled.mp4')
     purgelist = [f'../data/intermediates/{entry}' for entry in os.listdir('../data/intermediates/') if entry.startswith(vidMD5)]
     for item in purgelist:
         os.remove(item)
