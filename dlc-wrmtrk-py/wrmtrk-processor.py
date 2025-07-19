@@ -227,6 +227,25 @@ def track_data_processing(vidMD5):
                         memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p2, indv])
                         memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2t1_x,p2t1_y,p2t1_conf,frame_ind+1, p1, indv])
                         memCon.commit()
+        
+        # Delete labels that create impossible body segments
+        for frame_ind in range(min_frame,max_frame):
+            for p_i in range(1,len(points)-1):
+                p_a = points[p_i-1]
+                p_b = points[p_i]
+                p_c = points[p_i+1]
+
+                paQ = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_a, indv]).fetchone()
+                pbQ = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_b, indv]).fetchone()
+                pcQ = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_c, indv]).fetchone()
+
+                if (paQ and pbQ and pcQ) and (None not in paQ and None not in pbQ and None not in pcQ):
+                    pa_x, pa_y, = paQ
+                    pb_x, pb_y, = pbQ
+                    pc_x, pc_y, = pcQ
+                    if math.hypot(pb_x, pb_y, pa_x, pa_y) + math.hypot(pb_x, pb_y, pc_x, pc_y) > 4 * seg_len or math.hypot(pb_x, pb_y, pa_x, pa_y) > 2.5 * seg_len:
+                        memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_b, indv]) # Deleting points should cut apart bad tracklets
+                        memCon.commit()
                 
         # Delete label jumps to cut apart bad tracklets
         for frame_ind in range(min_frame,max_frame):
