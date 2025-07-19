@@ -17,6 +17,10 @@ cur.execute('UPDATE videos SET proc_state = "pending" WHERE proc_state = "proces
 con.commit()
 con.close()
 
+purgelist = [f'../data/intermediates/{entry}' for entry in os.listdir('../data/intermediates/') if entry != '.gitignore']
+for item in purgelist:
+    os.remove(item)
+
 def acquire_video_job():
     vidQ = None
     while vidQ is None:
