@@ -360,21 +360,24 @@ def track_data_processing(vidMD5):
         for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1]),label_ind_bounds)]:
             x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
-            cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (0, 255, 0), 1)
-            cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1, cv2.LINE_AA)
+            cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (115, 158, 0), 1)
+            cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 1, (115, 158, 0), 1, cv2.LINE_AA)
             parts_list = ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
-            for part in parts_list[1:-1]:
-                pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
-                if pointQ is not None:
-                    x0,y0 = pointQ
-                    cv2.circle(frame, (int(x0),int(y0)), 4, (0, 255, 0), -1)
             for i in range(2,len(parts_list)-1):
                 pointQ1 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i-1]]).fetchone()
                 pointQ2 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i]]).fetchone()
                 if pointQ1 is not None and pointQ2 is not None:
                     x0,y0 = pointQ1
                     x1,y1 = pointQ2
-                    cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (0, 255, 0), 1)
+                    cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (115, 158, 0), 1)
+            for part in parts_list[1:-1]:
+                pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
+                if pointQ is not None:
+                    x0,y0 = pointQ
+                    if part == '1/8_point':
+                        cv2.circle(frame, (int(x0),int(y0)), 4, (0, 94, 213), -1)
+                    else:
+                        cv2.circle(frame, (int(x0),int(y0)), 4, (115, 158, 0), -1)
         out_video.write(frame)
     src_video.release()
     out_video.release()
