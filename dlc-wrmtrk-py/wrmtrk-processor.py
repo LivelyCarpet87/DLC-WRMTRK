@@ -357,7 +357,7 @@ def track_data_processing(vidMD5):
     for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
         src_video.set(cv2.CAP_PROP_POS_FRAMES, frame_ind)
         ret, frame = src_video.read()
-        for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1],step_size),label_ind_bounds)]:
+        for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1]),label_ind_bounds)]:
             x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (0, 255, 0), 1)
