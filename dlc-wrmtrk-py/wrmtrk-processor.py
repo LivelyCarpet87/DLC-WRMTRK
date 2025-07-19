@@ -290,10 +290,12 @@ def track_data_processing(vidMD5):
     con.close()
     if len(speed_data) == 0:
         raise ValueError
-    elif len(speed_data) != intended_numIndv:
+    elif len(speed_data) == intended_numIndv:
+        mark_complete(vidMD5)
+    elif len(speed_data) in range(intended_numIndv-1,intended_numIndv+2):
         mark_warning(vidMD5)
     else:
-        mark_complete(vidMD5)
+        mark_error(vidMD5)
 
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
@@ -354,6 +356,13 @@ def mark_warning(vidMD5):
     con.commit()
     con.close()
 
+def mark_error(vidMD5):
+    con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
+    cur = con.cursor()
+    cur.execute("UPDATE videos SET proc_state = 'error' WHERE vidMD5 = ?", [vidMD5])
+    con.commit()
+    con.close()
+
 def mark_failed(vidMD5):
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
@@ -374,7 +383,7 @@ while True:
     vidMD5, numInd = acquire_video_job()
     print(f'Found job: {vidMD5}')
     try:
-        for attempt in range(3):
+        for attempt in range(4):
             try:
                 if attempt == 0:
                     dlc_track_data_generation(vidMD5, numInd)
@@ -384,6 +393,8 @@ while True:
                     dlc_track_data_generation(vidMD5, numInd-1)
                 elif attempt == 2:
                     dlc_track_data_generation(vidMD5, numInd+1)
+                elif attempt == 3:
+                    dlc_track_data_generation(vidMD5, None)
                 
                 track_data_processing(vidMD5)
             except ValueError:
