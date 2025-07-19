@@ -227,6 +227,20 @@ def track_data_processing(vidMD5):
                         memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p2, indv])
                         memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2t1_x,p2t1_y,p2t1_conf,frame_ind+1, p1, indv])
                         memCon.commit()
+                
+        # Delete label jumps to cut apart bad tracklets
+        for frame_ind in range(min_frame,max_frame):
+            for p in points:
+                pt0Q = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p, indv]).fetchone()
+                pt1Q = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p, indv]).fetchone()
+
+                if not (pt0Q and pt1Q and None not in pt0Q and None not in pt1Q):
+                    continue
+                pt0_x, pt0_y, = pt0Q
+                pt1_x, pt1_y, = pt1Q
+                if (math.hypot(pt0_x, pt0_y, pt1_x, pt1_y) > 0.5 * seg_len): # Points cannot jump half a segment length per frame
+                    memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p, indv]) # Deleting points should cut apart bad tracklets
+                    memCon.commit()
 
         #Calc speed
         video_path = os.path.abspath(f"../data/ingest/videos/{vidMD5}.mp4")
