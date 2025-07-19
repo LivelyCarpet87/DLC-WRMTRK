@@ -14,8 +14,8 @@ import "./globals.css";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Next App Mantine Tailwind Template",
-  description: "Next App Mantine Tailwind Template",
+  title: "DLC WRMTRK",
+  description: "C. elegans speed data pipeline using DeepLabCut.",
 };
 
 export default function RootLayout({
