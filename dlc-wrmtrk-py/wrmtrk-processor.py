@@ -48,10 +48,12 @@ def dlc_track_data_generation(vidMD5, numInd):
     dlc.analyze_videos(DLC_CFG_PATH, [video_path], videotype='.mp4', save_as_csv=True,
         shuffle=SHUFFLE, destfolder='../data/intermediates', n_tracks=numInd)
     
+    """
     dlc.create_labeled_video(DLC_CFG_PATH, [video_path], videotype='mp4', 
                             shuffle=SHUFFLE, fastmode=True, displayedbodyparts='all', 
                             displayedindividuals='all', codec='mp4v', 
                             destfolder=os.path.abspath(f"../data/intermediates"), draw_skeleton=False, color_by='bodypart', track_method='box')
+    """
 
 def track_data_processing(vidMD5):
     memCon = sqlite3.connect(':memory:')
@@ -213,25 +215,58 @@ def track_data_processing(vidMD5):
                     and (math.hypot(p2t0_x, p2t0_y, p2t1_x, p2t1_y) > 0.5 * seg_len) \
                     and (math.hypot(p2t0_x, p2t0_y, p1t1_x, p1t1_y) < 0.5 * seg_len):
                         memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2t1_x,p2t1_y,p2t1_conf,frame_ind+1, p1, indv])
-                        memCur.execute(f"UPDATE labels SET(x_pos, y_pos), confidence VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1t1_x,p1t1_y,p1t1_conf,frame_ind+1, p2, indv])
+                        memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1t1_x,p1t1_y,p1t1_conf,frame_ind+1, p2, indv])
                         memCon.commit()
                 elif p1t1Q and None not in p1t1Q:
                     p1t1_x, p1t1_y, p1t1_conf = p1t1Q
                     if (math.hypot(p1t0_x, p1t0_y, p1t1_x, p1t1_y) > 0.5 * seg_len) \
                     and (math.hypot(p1t0_x, p1t0_y, p2t0_x, p2t0_y) > seg_len) \
                     and (math.hypot(p2t0_x, p2t0_y, p1t1_x, p1t1_y) < 0.5 * seg_len):
-                        memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p1, indv])
-                        memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1t1_x,p1t1_y,p1t1_conf,frame_ind+1, p2, indv])
+                        memCur.execute(f"UPDATE labels SET(bodypart) VALUES(?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2, frame_ind+1, p1, indv])
                         memCon.commit()
                 elif p2t1Q and None not in p2t1Q:
                     p2t1_x, p2t1_y, p2t1_conf = p2t1Q
                     if (math.hypot(p2t0_x, p2t0_y, p2t1_x, p2t1_x) > 0.5 * seg_len) \
                     and (math.hypot(p1t0_x, p1t0_y, p2t0_x, p2t0_y) > seg_len) \
                     and (math.hypot(p1t0_x, p1t0_y, p2t1_x, p2t1_y) < 0.5 * seg_len):
-                        memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p2, indv])
-                        memCur.execute(f"UPDATE labels SET(x_pos, y_pos, confidence) VALUES(?,?,?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2t1_x,p2t1_y,p2t1_conf,frame_ind+1, p1, indv])
+                        memCur.execute(f"UPDATE labels SET(bodypart) VALUES(?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1, frame_ind+1, p2, indv])
                         memCon.commit()
         
+        # Vote on forward direction (Set direction of movement as head)
+        for frame_ind in range(min_frame+1,max_frame+1):
+            flip_vote = 0
+            for p_i in range(1,len(points)-1):
+                p_a = points[p_i-1]
+                p_b = points[p_i]
+                p_c = points[p_i+1]
+
+                paQ_t0 = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind-1, p_a, indv]).fetchone()
+                pbQ_t0 = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind-1, p_b, indv]).fetchone()
+                pbQ_t1 = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_b, indv]).fetchone()
+                pcQ_t0 = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind-1, p_c, indv]).fetchone()
+
+                if (paQ_t0 and pbQ_t0 and pcQ_t0 and pbQ_t1) and (None not in paQ_t0 and None not in pbQ_t0 and None not in pcQ_t0 and None not in pbQ_t1):
+                    pa_x, pa_y = paQ
+                    pb_t0_x, pb_t0_y = pbQ
+                    pb_t1_x, pb_t1_y = pbQ
+                    pc_x, pc_y, = pcQ
+
+                    va = np.array((pa_x-pb_t0_x,pa_y-pb_t0_y)) / np.linalg.norm((pa_x-pb_t0_x,pa_y-pb_t0_y))
+                    vc =  np.array((pc_x-pb_t0_x,pc_x-pb_t0_y)) / np.linalg.norm((pa_x-pb_t0_x,pa_y-pb_t0_y))
+                    vb = (pb_t1_x-pb_t0_x,pb_t1_y-pb_t0_y)
+
+                    if np.dot(va, vb) > np.dot(vc, vb):
+                        flip_vote += 1
+                    else:
+                        flip_vote -= 1
+            if flip_vote > 2:
+                print("\nFLIP VOTE!\n")
+                for p_i in range(len(points)):
+                    memCur.execute(f"UPDATE labels SET(bodypart) VALUES(?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [points[len(points)-1-p_i]+"_f", frame_ind, points[p_i], indv])
+                for p_i in range(len(points)):
+                    memCur.execute(f"UPDATE labels SET(bodypart) VALUES(?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [points[p_i], frame_ind, points[p_i]+"_f", indv])
+
+
         # Delete labels that create impossible body segments
         for frame_ind in range(min_frame,max_frame):
             for p_i in range(1,len(points)-1):
