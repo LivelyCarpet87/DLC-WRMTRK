@@ -329,7 +329,7 @@ def track_data_processing(vidMD5):
                 if distance > indv_len/8*2:
                     distance = np.NaN
                 entry.append(distance)
-            if np.isnan(np.array(entry)).sum() == len(entry):
+            if np.isnan(np.array(entry)).sum() == len(entry) or np.isnan(np.array(entry)).sum() == len(entry)-1:
                 tracklet[1] = frame_ind
                 data.append(tracklet)
                 tracklet = [frame_ind+1,-1,[]]
@@ -350,7 +350,7 @@ def track_data_processing(vidMD5):
         elif len(longest_tracklet[2]) < 8:
             continue
         confidence = True
-        if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < 15:
+        if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < range(min_frame+step_size,max_frame+1,step_size)/2:
             confidence = False
         elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.70:
             confidence = False
