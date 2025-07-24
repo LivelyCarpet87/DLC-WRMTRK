@@ -122,8 +122,8 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
     } else if (normImg.type != "image/png") {
         setWarnMsg("Normalizing Image provided was not a PNG. The plate was not submitted for processing.");
         return;
-    } else if (normImg.size >= 1000000) {
-        setWarnMsg("Normalizing Image provided exceeded Max Size of 1MB. The plate was not submitted for processing.");
+    } else if (normImg.size >= 16000000) {
+        setWarnMsg("Normalizing Image provided exceeded Max Size of 16MB. The plate was not submitted for processing.");
         return;
     } else if (videoTiles.length == 0){
       setWarnMsg('No videos have been provided. The plate was not submitted for processing.');
@@ -146,8 +146,8 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
       } else if (videos.get(videoTiles[ind])!.video!.type != "video/mp4") {
         setWarnMsg("Video file provided for a specific entry was not an MP4 file. The plate was not submitted for processing.");
         return;
-      } else if (videos.get(videoTiles[ind])!.video!.size >= 16000000) {
-        setWarnMsg("Video file provided for a specific entry exceeded the max size of 16MB. The plate was not submitted for processing.");
+      } else if (videos.get(videoTiles[ind])!.video!.size >= 200000000) {
+        setWarnMsg("Video file provided for a specific entry exceeded the max size of 200MB. The plate was not submitted for processing.");
         return;
       } else if (videos.get(videoTiles[ind])!.numInd == undefined || videos.get(videoTiles[ind])!.numInd == 0) {
         setWarnMsg("Total Number of Individuals has not been provided for a specific entry. The plate was not submitted for processing.");

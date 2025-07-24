@@ -350,7 +350,7 @@ def track_data_processing(vidMD5):
         elif len(longest_tracklet[2]) < 8:
             continue
         confidence = True
-        if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < range(min_frame+step_size,max_frame+1,step_size)/2:
+        if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < len(range(min_frame+step_size,max_frame+1,step_size))/2:
             confidence = False
         elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.70:
             confidence = False
