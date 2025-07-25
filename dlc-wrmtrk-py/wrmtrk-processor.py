@@ -14,7 +14,7 @@ STEP_TIME = 0.2
 
 con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
 cur = con.cursor()
-cur.execute('UPDATE videos SET proc_state = "pending" WHERE proc_state = "processing"')
+cur.execute('UPDATE videos SET proc_state = "pending" WHERE proc_state = "processing" OR proc_state = "failed"')
 con.commit()
 con.close()
 
