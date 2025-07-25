@@ -10,7 +10,7 @@ DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
 SHUFFLE=1
 DLC_CFG_PATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
-STEP_TIME = 0.1
+STEP_TIME = 0.2
 
 con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
 cur = con.cursor()
@@ -343,7 +343,8 @@ def track_data_processing(vidMD5):
                 data.append(tracklet)
                 tracklet = [frame_ind+1,-1,[]]
             else:
-                tracklet[2].append(entry)
+                entry = np.array(entry)
+                tracklet[2].append(entry[abs(entry - np.median(entry)) < 1.5 * np.std(entry)])
         tracklet[1] = range(min_frame+step_size,max_frame+1,step_size)[-1]
         data.append(tracklet)
 
@@ -360,7 +361,7 @@ def track_data_processing(vidMD5):
         elif len(longest_tracklet[2]) <  len(range(min_frame+step_size,max_frame+1,step_size))/4:
             continue
         confidence = True
-        if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < len(range(min_frame+step_size,max_frame+1,step_size))/2:
+        if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < len(range(min_frame+step_size,max_frame+1,step_size))/3:
             confidence = False
         elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.8:
             confidence = False
