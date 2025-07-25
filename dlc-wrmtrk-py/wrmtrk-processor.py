@@ -8,7 +8,7 @@ import cv2
 
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
-SHUFFLE=1
+SHUFFLE=10
 DLC_CFG_PATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
 STEP_TIME = 0.2
 
@@ -335,7 +335,7 @@ def track_data_processing(vidMD5):
                     distance = np.NaN
                 else:
                     distance = math.hypot(x_pos_now - x_pos_prev, y_pos_now - y_pos_prev)
-                if distance > indv_len/8*1.5:
+                if distance > seg_len*1.5:
                     distance = np.NaN
                 entry.append(distance)
             if np.isnan(np.array(entry)).sum() > 0:
@@ -343,8 +343,8 @@ def track_data_processing(vidMD5):
                 data.append(tracklet)
                 tracklet = [frame_ind+1,-1,[]]
             else:
-                entry = np.array(entry)
-                tracklet[2].append(entry[abs(entry - np.median(entry)) < 1.5 * np.std(entry)])
+                pruned_entry = [x if abs(x - np.median(entry)) < 1.5 * np.std(entry) else np.NaN for x in entry ]
+                tracklet[2].append(pruned_entry)
         tracklet[1] = range(min_frame+step_size,max_frame+1,step_size)[-1]
         data.append(tracklet)
 
@@ -355,6 +355,7 @@ def track_data_processing(vidMD5):
             print(f"The longest tracklet of {indv} for {vidMD5} was empty.")
             raise ValueError
         speed = np.nanmean(np.array(longest_tracklet[2]))/step_size*fps
+        print("Testing speed is a valid value.")
         if np.isnan(speed):
             print(f"The speed of {indv} for {vidMD5} was NaN.")
             raise ValueError
@@ -364,6 +365,7 @@ def track_data_processing(vidMD5):
         elif len(longest_tracklet[2]) <  len(range(min_frame+step_size,max_frame+1,step_size))/4:
             print(f"The longest tracklet of {indv} for {vidMD5} did not meet length threshold")
             continue
+        print("Assigning confidence value.")
         confidence = True
         if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < len(range(min_frame+step_size,max_frame+1,step_size))/3:
             confidence = False
