@@ -8,7 +8,7 @@ import cv2
 
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
-SHUFFLE=10
+SHUFFLE=1
 DLC_CFG_PATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
 STEP_TIME = 0.2
 
