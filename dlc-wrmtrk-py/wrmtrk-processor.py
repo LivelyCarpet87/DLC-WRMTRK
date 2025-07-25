@@ -339,7 +339,7 @@ def track_data_processing(vidMD5):
                     if distance > seg_len*1.5:
                         distance = np.NaN
                     entry.append(distance)
-                if np.isnan(np.array(entry)).sum() > 0:
+                if np.isnan(np.array(entry)).sum() > 2:
                     tracklet[1] = frame_ind
                     data.append(tracklet)
                     tracklet = [frame_ind+1,-1,[]]
