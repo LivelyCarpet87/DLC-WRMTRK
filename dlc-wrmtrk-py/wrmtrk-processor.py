@@ -371,7 +371,7 @@ def track_data_processing(vidMD5):
         if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < len(range(min_frame+step_size,max_frame+1,step_size))/3:
             print(f"Length for longest tracklet of {indv} for {vidMD5} was too short for confidence.")
             confidence = False
-        elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.75:
+        elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ? AND frame_num >= ? AND frame_num < ?', [indv,longest_tracklet[0],longest_tracklet[1]]).fetchone()[0] < 0.75:
             print(f"Average label confidence of {indv} for {vidMD5} was too low for confidence.")
             confidence = False
         speed_data.append( (indv,speed,confidence, longest_tracklet[0:2]) )
