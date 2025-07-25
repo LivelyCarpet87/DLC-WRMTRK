@@ -352,13 +352,17 @@ def track_data_processing(vidMD5):
 
         print(f"Calculating speed of {indv} for {vidMD5}")
         if len(longest_tracklet[2]) == 0:
+            print(f"The longest tracklet of {indv} for {vidMD5} was empty.")
             raise ValueError
         speed = np.nanmean(np.array(longest_tracklet[2]))/step_size*fps
         if np.isnan(speed):
+            print(f"The speed of {indv} for {vidMD5} was NaN.")
             raise ValueError
         elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.50:
+            print(f"Confidence for longest tracklet of {indv} for {vidMD5} did not meet threshold")
             continue
         elif len(longest_tracklet[2]) <  len(range(min_frame+step_size,max_frame+1,step_size))/4:
+            print(f"The longest tracklet of {indv} for {vidMD5} did not meet length threshold")
             continue
         confidence = True
         if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < len(range(min_frame+step_size,max_frame+1,step_size))/3:
@@ -372,6 +376,7 @@ def track_data_processing(vidMD5):
     intended_numIndv = cur.execute("SELECT numInd FROM videos WHERE vidMD5 = ?", [vidMD5]).fetchone()[0]
     con.close()
     if len(speed_data) == 0:
+        print(f"No speed data was found for {vidMD5}.")
         raise ValueError
     elif len(speed_data) == intended_numIndv:
         mark_complete(vidMD5)
