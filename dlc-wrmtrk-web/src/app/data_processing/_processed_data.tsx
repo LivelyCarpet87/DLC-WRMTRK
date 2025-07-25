@@ -2,11 +2,11 @@
 
 import { Title, Button, CopyButton, Table, Loader, Skeleton, Pill, Tooltip } from "@mantine/core";
 import { UUID } from "crypto";
-import { MutableRefObject, useRef } from "react";
+import { MutableRefObject, useRef, memo } from "react";
 import useSWR from "swr";
 
 
-function VideoTile({md5}:{md5:string}){
+const VideoTile = memo(function VideoTile({md5}:{md5:string}){
     const pauseRef = useRef(false);
     const fetchWithToken = async (url:string, md5:string) => {
         const plateFormData = new FormData();
@@ -151,7 +151,7 @@ function VideoTile({md5}:{md5:string}){
             {dataDisplay}
         </div>
     );
-}
+})
 
 function PlateTile({uuid}:{uuid:UUID}){
     const fetchWithToken = async (url:string, uuid:string) => {
