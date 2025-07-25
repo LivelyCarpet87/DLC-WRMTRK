@@ -8,8 +8,9 @@ import cv2
 
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
-SHUFFLE=10
+SHUFFLE=1
 DLC_CFG_PATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
+STEP_TIME = 0.1
 
 con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
 cur = con.cursor()
@@ -45,7 +46,7 @@ def acquire_video_job():
 
 def dlc_track_data_generation(vidMD5, numInd):
     video_path = os.path.abspath(f"../data/ingest/videos/{vidMD5}.mp4")
-    dlc.analyze_videos(DLC_CFG_PATH, [video_path], videotype='.mp4', save_as_csv=True,
+    dlc.analyze_videos(DLC_CFG_PATH, [video_path], videotype='.mp4', save_as_csv=True, use_shelve=False,
         shuffle=SHUFFLE, destfolder='../data/intermediates', n_tracks=numInd)
     
     """
@@ -56,6 +57,7 @@ def dlc_track_data_generation(vidMD5, numInd):
     """
 
 def track_data_processing(vidMD5):
+    print(f"Post processing {vidMD5}")
     memCon = sqlite3.connect(':memory:')
     memCur = memCon.cursor()
 
@@ -138,6 +140,7 @@ def track_data_processing(vidMD5):
     speed_data = []
     for indv in [f"ind{i}" for i in range(1,numInd+1)]:
         # Calc len
+        print(f"Calculating length of {indv} for {vidMD5}")
         get_body_pos_never_null_query = '''
         SELECT
         head.x_pos         AS head_x,          head.y_pos         AS head_y,
@@ -150,14 +153,14 @@ def track_data_processing(vidMD5):
         p78.x_pos          AS seven_eighths_x, p78.y_pos           AS seven_eighths_y,
         tail.x_pos         AS tail_x,          tail.y_pos          AS tail_y
         FROM labels AS head
-        JOIN labels AS p18 ON p18.frame_num = head.frame_num AND p18.indiv = head.indiv AND p18.bodypart = '1/8_point' AND p18.x_pos IS NOT NULL AND p18.x_pos = p18.x_pos AND p18.y_pos IS NOT NULL AND p18.y_pos = p18.y_pos
-        JOIN labels AS p14 ON p14.frame_num = head.frame_num AND p14.indiv = head.indiv AND p14.bodypart = '1/4_point' AND p14.x_pos IS NOT NULL AND p14.x_pos = p14.x_pos AND p14.y_pos IS NOT NULL AND p14.y_pos = p14.y_pos
-        JOIN labels AS p38 ON p38.frame_num = head.frame_num AND p38.indiv = head.indiv AND p38.bodypart = '3/8_point' AND p38.x_pos IS NOT NULL AND p38.x_pos = p38.x_pos AND p38.y_pos IS NOT NULL AND p38.y_pos = p38.y_pos
-        JOIN labels AS p12 ON p12.frame_num = head.frame_num AND p12.indiv = head.indiv AND p12.bodypart = '1/2_point' AND p12.x_pos IS NOT NULL AND p12.x_pos = p12.x_pos AND p12.y_pos IS NOT NULL AND p12.y_pos = p12.y_pos
-        JOIN labels AS p58 ON p58.frame_num = head.frame_num AND p58.indiv = head.indiv AND p58.bodypart = '5/8_point' AND p58.x_pos IS NOT NULL AND p58.x_pos = p58.x_pos AND p58.y_pos IS NOT NULL AND p58.y_pos = p58.y_pos
-        JOIN labels AS p34 ON p34.frame_num = head.frame_num AND p34.indiv = head.indiv AND p34.bodypart = '3/4_point' AND p34.x_pos IS NOT NULL AND p34.x_pos = p34.x_pos AND p34.y_pos IS NOT NULL AND p34.y_pos = p34.y_pos
-        JOIN labels AS p78 ON p78.frame_num = head.frame_num AND p78.indiv = head.indiv AND p78.bodypart = '7/8_point' AND p78.x_pos IS NOT NULL AND p78.x_pos = p78.x_pos AND p78.y_pos IS NOT NULL AND p78.y_pos = p78.y_pos
-        JOIN labels AS tail ON tail.frame_num = head.frame_num AND tail.indiv = head.indiv AND tail.bodypart = 'tail' AND tail.x_pos IS NOT NULL AND tail.x_pos = tail.x_pos AND tail.y_pos IS NOT NULL AND tail.y_pos = tail.y_pos
+        JOIN labels AS p18 ON p18.frame_num = head.frame_num AND p18.indiv = head.indiv AND p18.bodypart = '1/8_point' AND p18.x_pos IS NOT NULL AND p18.y_pos IS NOT NULL
+        JOIN labels AS p14 ON p14.frame_num = head.frame_num AND p14.indiv = head.indiv AND p14.bodypart = '1/4_point' AND p14.x_pos IS NOT NULL AND p14.y_pos IS NOT NULL
+        JOIN labels AS p38 ON p38.frame_num = head.frame_num AND p38.indiv = head.indiv AND p38.bodypart = '3/8_point' AND p38.x_pos IS NOT NULL AND p38.y_pos IS NOT NULL
+        JOIN labels AS p12 ON p12.frame_num = head.frame_num AND p12.indiv = head.indiv AND p12.bodypart = '1/2_point' AND p12.x_pos IS NOT NULL AND p12.y_pos IS NOT NULL
+        JOIN labels AS p58 ON p58.frame_num = head.frame_num AND p58.indiv = head.indiv AND p58.bodypart = '5/8_point' AND p58.x_pos IS NOT NULL AND p58.y_pos IS NOT NULL
+        JOIN labels AS p34 ON p34.frame_num = head.frame_num AND p34.indiv = head.indiv AND p34.bodypart = '3/4_point' AND p34.x_pos IS NOT NULL AND p34.y_pos IS NOT NULL
+        JOIN labels AS p78 ON p78.frame_num = head.frame_num AND p78.indiv = head.indiv AND p78.bodypart = '7/8_point' AND p78.x_pos IS NOT NULL AND p78.y_pos IS NOT NULL
+        JOIN labels AS tail ON tail.frame_num = head.frame_num AND tail.indiv = head.indiv AND tail.bodypart = 'tail' AND tail.x_pos IS NOT NULL AND tail.y_pos IS NOT NULL
         WHERE
         head.bodypart = 'head' AND
         head.indiv = ? AND
@@ -184,13 +187,18 @@ def track_data_processing(vidMD5):
             for i in range(len(points) - 1):
                 x1, y1 = row[2 * i], row[2 * i + 1]
                 x2, y2 = row[2 * (i + 1)], row[2 * (i + 1) + 1]
-                length += math.hypot(x1, y1, x2, y2)
-            lengths.append(length)
-        
+                length += math.hypot( x1 - x2, y1 - y2)
+            if not np.isnan(length):
+                lengths.append(length)
+        if len(lengths) == 0:
+            print(f"Unable to acquire median length for {indv} of {vidMD5}")
+            continue
         indv_len = np.median(lengths)
 
-        # unflip points
         seg_len = indv_len / (len(points)-1)
+
+        """
+        # unflip points
         for frame_ind in range(min_frame,max_frame):
             for px in range(int(len(points)/2)):
                 p1 = points[px]
@@ -266,7 +274,6 @@ def track_data_processing(vidMD5):
                 for p_i in range(len(points)):
                     memCur.execute(f"UPDATE labels SET(bodypart) VALUES(?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [points[p_i], frame_ind, points[p_i]+"_f", indv])
 
-
         # Delete labels that create impossible body segments
         for frame_ind in range(min_frame,max_frame):
             for p_i in range(1,len(points)-1):
@@ -299,14 +306,16 @@ def track_data_processing(vidMD5):
                 if (math.hypot(pt0_x, pt0_y, pt1_x, pt1_y) > 0.5 * seg_len): # Points cannot jump half a segment length per frame
                     memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p, indv]) # Deleting points should cut apart bad tracklets
                     memCon.commit()
+        """
 
         #Calc speed
         video_path = os.path.abspath(f"../data/ingest/videos/{vidMD5}.mp4")
         src_video = cv2.VideoCapture(video_path)
         fps = src_video.get(cv2.CAP_PROP_FPS)
-        step_size = int(fps*0.2)+1
+        step_size = int(fps*STEP_TIME)+1
         data = []
         tracklet = [0,-1,[]]
+        print(f"Calculating tracklets of {indv} for {vidMD5}")
         for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
             entry = []
             for bodypart in parts_list[1:-1]: # Ignore ends of the worms
@@ -326,10 +335,10 @@ def track_data_processing(vidMD5):
                     distance = np.NaN
                 else:
                     distance = math.hypot(x_pos_now - x_pos_prev, y_pos_now - y_pos_prev)
-                if distance > indv_len/8*2:
+                if distance > indv_len/8:
                     distance = np.NaN
                 entry.append(distance)
-            if np.isnan(np.array(entry)).sum() == len(entry) or np.isnan(np.array(entry)).sum() == len(entry)-1:
+            if np.isnan(np.array(entry)).sum() > 0:
                 tracklet[1] = frame_ind
                 data.append(tracklet)
                 tracklet = [frame_ind+1,-1,[]]
@@ -340,6 +349,7 @@ def track_data_processing(vidMD5):
 
         longest_tracklet = max(data, key=lambda x: x[1]-x[0])
 
+        print(f"Calculating speed of {indv} for {vidMD5}")
         if len(longest_tracklet[2]) == 0:
             raise ValueError
         speed = np.nanmean(np.array(longest_tracklet[2]))/step_size*fps
@@ -347,12 +357,12 @@ def track_data_processing(vidMD5):
             raise ValueError
         elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.50:
             continue
-        elif len(longest_tracklet[2]) < 8:
+        elif len(longest_tracklet[2]) <  len(range(min_frame+step_size,max_frame+1,step_size))/4:
             continue
         confidence = True
         if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4 or len(longest_tracklet[2]) < len(range(min_frame+step_size,max_frame+1,step_size))/2:
             confidence = False
-        elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.70:
+        elif memCur.execute('SELECT AVG(confidence) from labels WHERE indiv = ?', [indv]).fetchone()[0] < 0.8:
             confidence = False
         speed_data.append( (indv,speed,confidence, longest_tracklet[0:2]) )
     
@@ -395,8 +405,8 @@ def track_data_processing(vidMD5):
         for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1]),label_ind_bounds)]:
             x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
-            cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (115, 158, 0), 1)
-            cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 1, (115, 158, 0), 1, cv2.LINE_AA)
+            cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (115, 158, 0), 4)
+            cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 2, (115, 158, 0), 4, cv2.LINE_AA)
             parts_list = ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
             for i in range(2,len(parts_list)-1):
                 pointQ1 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i-1]]).fetchone()
@@ -404,15 +414,15 @@ def track_data_processing(vidMD5):
                 if pointQ1 is not None and pointQ2 is not None:
                     x0,y0 = pointQ1
                     x1,y1 = pointQ2
-                    cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (115, 158, 0), 1)
+                    cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (115, 158, 0), 4)
             for part in parts_list[1:-1]:
                 pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
                 if pointQ is not None:
                     x0,y0 = pointQ
                     if part == '1/8_point':
-                        cv2.circle(frame, (int(x0),int(y0)), 4, (0, 94, 213), -1)
+                        cv2.circle(frame, (int(x0),int(y0)), 16, (0, 94, 213), -1)
                     else:
-                        cv2.circle(frame, (int(x0),int(y0)), 4, (115, 158, 0), -1)
+                        cv2.circle(frame, (int(x0),int(y0)), 16, (115, 158, 0), -1)
         out_video.write(frame)
     src_video.release()
     out_video.release()
