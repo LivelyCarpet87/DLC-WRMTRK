@@ -36,9 +36,9 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
     const proc_state = videoSWR.data.proc_state;
     let proc_indicator = <Loader color="gray" type="bars" size="xs" />;
     if (proc_state == "pending"){
-        proc_indicator = (<Tooltip label="Video in line for processing." openDelay={1000}><Loader color="gray" type="bars" size="xs" /></Tooltip>);
+        proc_indicator = (<Loader color="gray" type="bars" size="xs" />);
     } else if (proc_state == "processing"){
-        proc_indicator = (<Tooltip label="Video is processing." openDelay={1000}><Loader color="green" type="bars" size="xs" /></Tooltip>);
+        proc_indicator = (<Loader color="green" type="bars" size="xs" />);
     } else if (proc_state == "done"){
         pauseRef.current = true;
         proc_indicator = (
