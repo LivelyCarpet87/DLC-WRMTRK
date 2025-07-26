@@ -4,7 +4,9 @@ import sqlite3, os
 import deeplabcut as dlc
 import numpy as np
 import cv2
+import torch
 
+torch.backends.nnpack.enabled = False
 
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
