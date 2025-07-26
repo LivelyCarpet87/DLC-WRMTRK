@@ -335,7 +335,7 @@ def track_data_processing(vidMD5):
                     distance = np.NaN
                 else:
                     distance = math.hypot(x_pos_now - x_pos_prev, y_pos_now - y_pos_prev)
-                if distance > seg_len*1.5:
+                if distance > seg_len*2:
                     distance = np.NaN
                 entry.append(distance)
             if np.isnan(np.array(entry)).sum() > 2:
