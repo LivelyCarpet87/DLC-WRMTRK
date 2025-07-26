@@ -315,39 +315,38 @@ def track_data_processing(vidMD5):
         step_size = int(fps*STEP_TIME)+1
         data = []
         print(f"Calculating possible tracklets of {indv} for {vidMD5}")
-        for offset in range(step_size):
-            tracklet = [offset,-1,[]]
-            for frame_ind in range(min_frame+step_size+offset,max_frame+1,step_size):
-                entry = []
-                for bodypart in parts_list[1:-1]: # Ignore ends of the worms
-                    x_pos_prev = np.NaN
-                    y_pos_prev = np.NaN
-                    prev_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
-                    if prev_q is not None:
-                        x_pos_prev = prev_q[0]
-                        y_pos_prev = prev_q[1]
-                    x_pos_now = np.NaN
-                    y_pos_now = np.NaN
-                    now_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind, indv, bodypart) ).fetchone()
-                    if now_q is not None:
-                        x_pos_now = now_q[0]
-                        y_pos_now = now_q[1]
-                    if None in [x_pos_prev, y_pos_prev, x_pos_now, y_pos_now]:
-                        distance = np.NaN
-                    else:
-                        distance = math.hypot(x_pos_now - x_pos_prev, y_pos_now - y_pos_prev)
-                    if distance > seg_len*1.5:
-                        distance = np.NaN
-                    entry.append(distance)
-                if np.isnan(np.array(entry)).sum() > 2:
-                    tracklet[1] = frame_ind
-                    data.append(tracklet)
-                    tracklet = [frame_ind+1,-1,[]]
+        tracklet = [0,-1,[]]
+        for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
+            entry = []
+            for bodypart in parts_list[1:-1]: # Ignore ends of the worms
+                x_pos_prev = np.NaN
+                y_pos_prev = np.NaN
+                prev_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
+                if prev_q is not None:
+                    x_pos_prev = prev_q[0]
+                    y_pos_prev = prev_q[1]
+                x_pos_now = np.NaN
+                y_pos_now = np.NaN
+                now_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind, indv, bodypart) ).fetchone()
+                if now_q is not None:
+                    x_pos_now = now_q[0]
+                    y_pos_now = now_q[1]
+                if None in [x_pos_prev, y_pos_prev, x_pos_now, y_pos_now]:
+                    distance = np.NaN
                 else:
-                    pruned_entry = [x if abs(x - np.median(entry)) < 1.5 * np.std(entry) else np.NaN for x in entry ]
-                    tracklet[2].append(pruned_entry)
-            tracklet[1] = range(min_frame+step_size+offset,max_frame+1,step_size)[-1]
-            data.append(tracklet)
+                    distance = math.hypot(x_pos_now - x_pos_prev, y_pos_now - y_pos_prev)
+                if distance > seg_len*1.5:
+                    distance = np.NaN
+                entry.append(distance)
+            if np.isnan(np.array(entry)).sum() > 2:
+                tracklet[1] = frame_ind
+                data.append(tracklet)
+                tracklet = [frame_ind+1,-1,[]]
+            else:
+                pruned_entry = [x if abs(x - np.median(entry)) < 1.5 * np.std(entry) else np.NaN for x in entry ]
+                tracklet[2].append(pruned_entry)
+        tracklet[1] = range(min_frame+step_size,max_frame+1,step_size)[-1]
+        data.append(tracklet)
 
         longest_tracklet = max(data, key=lambda x: x[1]-x[0])
 
