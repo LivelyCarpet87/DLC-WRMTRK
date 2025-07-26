@@ -366,7 +366,7 @@ def track_data_processing(vidMD5):
             continue
         print("Assigning confidence value.")
         confidence = True
-        if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2])/4:
+        if np.isnan(np.array(longest_tracklet[2])).sum() > len(longest_tracklet[2]):
             print(f"Too many inconsistencies in tracklet of {indv} for {vidMD5} for confidence.")
             confidence = False
         elif longest_tracklet[1] - longest_tracklet[0] < (max_frame-min_frame-step_size)/3:
