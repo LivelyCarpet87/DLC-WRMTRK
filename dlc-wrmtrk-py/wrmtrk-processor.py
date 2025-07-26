@@ -416,6 +416,8 @@ def track_data_processing(vidMD5):
         for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1]),label_ind_bounds)]:
             x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ? AND x_pos != NULL and y_pos != NULL', [frame_ind, indv]).fetchone()
             x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ? AND x_pos != NULL and y_pos != NULL', [frame_ind, indv]).fetchone()
+            if x0 is None or y0 is None or x1 is None or y1 is None:
+                continue
             cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (115, 158, 0), 4)
             cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 2, (115, 158, 0), 4, cv2.LINE_AA)
             parts_list = ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
@@ -425,11 +427,15 @@ def track_data_processing(vidMD5):
                 if pointQ1 is not None and pointQ2 is not None:
                     x0,y0 = pointQ1
                     x1,y1 = pointQ2
+                    if x0 is None or y0 is None or x1 is None or y1 is None:
+                        continue
                     cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (115, 158, 0), 4)
             for part in parts_list[1:-1]:
                 pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
                 if pointQ is not None:
                     x0,y0 = pointQ
+                    if x0 is None or y0 is None:
+                        continue
                     if part == '1/8_point':
                         cv2.circle(frame, (int(x0),int(y0)), 16, (0, 94, 213), -1)
                     else:
