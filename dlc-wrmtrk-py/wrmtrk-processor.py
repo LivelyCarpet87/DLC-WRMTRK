@@ -431,7 +431,7 @@ def track_data_processing(vidMD5):
                     x1,y1 = pointQ2
                     cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (115, 158, 0), 4)
             for part in parts_list[1:-1]:
-                pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
+                pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?  AND x_pos != NULL and y_pos != NULL', [frame_ind, indv, part]).fetchone()
                 if pointQ is not None:
                     x0,y0 = pointQ
                     if part == '1/8_point':
