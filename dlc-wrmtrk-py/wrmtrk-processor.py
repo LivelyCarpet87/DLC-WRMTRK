@@ -366,7 +366,7 @@ def track_data_processing(vidMD5):
             continue
         print("Assigning confidence value.")
         confidence = True
-        if longest_tracklet[1] - longest_tracklet[0] < (max_frame-min_frame-step_size)*3/4:
+        if longest_tracklet[1] - longest_tracklet[0] < (max_frame-min_frame-step_size)*2/3:
             print(f"Length for longest tracklet of {indv} for {vidMD5} was too short for confidence. {longest_tracklet[1] - longest_tracklet[0]} < {(max_frame-min_frame-step_size)/3}")
             confidence = False
         speed_data.append( (indv,speed,confidence, longest_tracklet[0:2]) )
