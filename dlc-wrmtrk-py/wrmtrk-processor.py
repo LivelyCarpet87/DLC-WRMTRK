@@ -51,12 +51,12 @@ def dlc_track_data_generation(vidMD5, numInd):
     dlc.analyze_videos(DLC_CFG_PATH, [video_path], videotype='.mp4', save_as_csv=True, use_shelve=False,
         shuffle=SHUFFLE, destfolder='../data/intermediates', n_tracks=numInd)
     
-    """
+
     dlc.create_labeled_video(DLC_CFG_PATH, [video_path], videotype='mp4', 
                             shuffle=SHUFFLE, fastmode=True, displayedbodyparts='all', 
                             displayedindividuals='all', codec='mp4v', 
                             destfolder=os.path.abspath(f"../data/intermediates"), draw_skeleton=False, color_by='bodypart', track_method='box')
-    """
+
 
 def track_data_processing(vidMD5):
     print(f"Post processing {vidMD5}")
@@ -320,34 +320,24 @@ def track_data_processing(vidMD5):
         print(f"Calculating possible tracklets of {indv} for {vidMD5}")
         tracklet = [0,-1,[]]
         for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
-            entry = []
+            prev_pos = []
+            now_pos = []
             for bodypart in parts_list[1:-1]: # Ignore ends of the worms
-                x_pos_prev = np.NaN
-                y_pos_prev = np.NaN
                 prev_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
                 if prev_q is not None:
-                    x_pos_prev = prev_q[0]
-                    y_pos_prev = prev_q[1]
-                x_pos_now = np.NaN
-                y_pos_now = np.NaN
+                    prev_pos.append(prev_q)
                 now_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind, indv, bodypart) ).fetchone()
                 if now_q is not None:
-                    x_pos_now = now_q[0]
-                    y_pos_now = now_q[1]
-                if None in [x_pos_prev, y_pos_prev, x_pos_now, y_pos_now]:
-                    distance = np.NaN
-                else:
-                    distance = math.hypot(x_pos_now - x_pos_prev, y_pos_now - y_pos_prev)
-                if distance > seg_len*2:
-                    distance = np.NaN
-                entry.append(distance)
-            if np.isnan(np.array(entry)).sum() > 2:
+                    now_pos.append(now_q)
+            prev_pos_vec = np.average(np.array(prev_pos), axis=0)      
+            now_pos_vec =  np.average(np.array(now_pos), axis=0)
+            distance = np.linalg.norm( now_pos_vec - prev_pos_vec )
+            if distance > 2*seg_len:
                 tracklet[1] = frame_ind
                 data.append(tracklet)
                 tracklet = [frame_ind+1,-1,[]]
             else:
-                pruned_entry = [x if abs(x - np.median(entry)) < 1.5 * np.std(entry) else np.NaN for x in entry ]
-                tracklet[2].append(pruned_entry)
+                tracklet[2].append(distance)
         tracklet[1] = range(min_frame+step_size,max_frame+1,step_size)[-1]
         data.append(tracklet)
 
@@ -357,7 +347,8 @@ def track_data_processing(vidMD5):
         if len(longest_tracklet[2]) == 0:
             print(f"The longest tracklet of {indv} for {vidMD5} was empty.")
             raise ValueError
-        speed = np.nanmean(np.array(longest_tracklet[2]))/step_size*fps
+        pruned_tracklet =  [x if abs(x - np.median(longest_tracklet[2])) < 1.5 * np.std(longest_tracklet[2]) else np.NaN for x in longest_tracklet[2] ]
+        speed = np.nanmean(np.array(pruned_tracklet))/step_size*fps
         print("Testing speed is a valid value.")
         if np.isnan(speed):
             print(f"The speed of {indv} for {vidMD5} was NaN.")
@@ -410,24 +401,9 @@ def track_data_processing(vidMD5):
         src_video.set(cv2.CAP_PROP_POS_FRAMES, frame_ind)
         ret, frame = src_video.read()
         for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1]),label_ind_bounds)]:
-            x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
-            x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
-            if x0 is None or y0 is None or x1 is None or y1 is None:
-                print("Box boundaries had NoneType", x0,y0,x1,y1)
-                continue
-            cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (115, 158, 0), 4)
-            cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 2, (115, 158, 0), 4, cv2.LINE_AA)
             parts_list = ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
-            for i in range(2,len(parts_list)-1):
-                pointQ1 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i-1]]).fetchone()
-                pointQ2 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i]]).fetchone()
-                if pointQ1 is not None and pointQ2 is not None:
-                    x0,y0 = pointQ1
-                    x1,y1 = pointQ2
-                    if x0 is None or y0 is None or x1 is None or y1 is None:
-                        print("Body part segment had NoneType", x0,y0,x1,y1)
-                        continue
-                    cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (115, 158, 0), 4)
+            
+            pos_list = []
             for part in parts_list[1:-1]:
                 pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
                 if pointQ is not None:
@@ -435,10 +411,11 @@ def track_data_processing(vidMD5):
                     if x0 is None or y0 is None:
                         print("Body part had NoneType", x0,y0)
                         continue
-                    if part == '1/8_point':
-                        cv2.circle(frame, (int(x0),int(y0)), 16, (0, 94, 213), -1)
-                    else:
-                        cv2.circle(frame, (int(x0),int(y0)), 16, (115, 158, 0), -1)
+                    pos_list.append( (x0,y0) )
+            pos = np.average(np.array(pos_list), axis=0)    
+
+            cv2.circle(frame, (int(pos[0]),int(pos[1])), 16, (0, 94, 213), -1)
+            cv2.putText(frame, indv, (int(pos[0]+16),int(pos[1]-16)), cv2.FONT_HERSHEY_SIMPLEX, 2, (115, 158, 0), 4, cv2.LINE_AA)
         out_video.write(frame)
     src_video.release()
     out_video.release()
