@@ -324,13 +324,11 @@ def track_data_processing(vidMD5):
             now_pos = []
             for bodypart in parts_list[1:-1]: # Ignore ends of the worms
                 prev_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
-                if prev_q is not None:
+                if prev_q is not None and None not in prev_q:
                     prev_pos.append(prev_q)
                 now_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind, indv, bodypart) ).fetchone()
-                if now_q is not None:
+                if now_q is not None and None not in now_q:
                     now_pos.append(now_q)
-            if None in prev_pos or None is now_pos:
-                continue
             prev_pos_vec = np.nanmean(np.array(prev_pos), axis=0)      
             now_pos_vec =  np.nanmean(np.array(now_pos), axis=0)
             distance = np.linalg.norm( now_pos_vec - prev_pos_vec )
