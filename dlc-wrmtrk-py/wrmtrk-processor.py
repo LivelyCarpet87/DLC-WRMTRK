@@ -239,7 +239,7 @@ def track_data_processing(vidMD5):
                     if (math.hypot(p2t0_x - p2t1_x, p2t0_y - p2t1_x) > 0.25 * seg_len) \
                     and (math.hypot(p1t0_x - p2t0_x, p1t0_y - p2t0_y) > seg_len) \
                     and (math.hypot(p1t0_x - p2t1_x, p1t0_y - p2t1_y) < 0.25 * seg_len):
-                        memCur.execute(f"UPDATE labels bodypart = ? WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1, frame_ind+1, p2, indv])
+                        memCur.execute(f"UPDATE labels SET bodypart = ? WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1, frame_ind+1, p2, indv])
                         memCon.commit()
         
         """
