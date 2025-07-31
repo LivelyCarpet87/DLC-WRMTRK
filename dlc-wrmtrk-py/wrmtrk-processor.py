@@ -422,11 +422,11 @@ def track_data_processing(vidMD5):
                 pointQ1 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i-1]]).fetchone()
                 pointQ2 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i]]).fetchone()
                 if pointQ1 is not None and pointQ2 is not None:
+                    x0,y0 = pointQ1
+                    x1,y1 = pointQ2
                     if x0 is None or y0 is None or x1 is None or y1 is None:
                         print("Body part segment had NoneType", x0,y0,x1,y1)
                         continue
-                    x0,y0 = pointQ1
-                    x1,y1 = pointQ2
                     cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (115, 158, 0), 4)
             for part in parts_list[1:-1]:
                 pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
