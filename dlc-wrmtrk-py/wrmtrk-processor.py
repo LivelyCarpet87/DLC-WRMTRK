@@ -347,7 +347,7 @@ def track_data_processing(vidMD5):
         if len(longest_tracklet[2]) == 0:
             print(f"The longest tracklet of {indv} for {vidMD5} was empty.")
             raise ValueError
-        pruned_tracklet =  [x if abs(x - np.median(longest_tracklet[2])) < 1.5 * np.std(longest_tracklet[2]) else np.NaN for x in longest_tracklet[2] ]
+        pruned_tracklet =  [x if abs(x - np.nanmedian(longest_tracklet[2])) < 1.5 * np.nanstd(longest_tracklet[2]) else np.NaN for x in longest_tracklet[2] ]
         speed = np.nanmean(np.array(pruned_tracklet))/step_size*fps
         print("Testing speed is a valid value.")
         if np.isnan(speed):
