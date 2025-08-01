@@ -332,7 +332,7 @@ def track_data_processing(vidMD5):
             prev_pos_vec = np.nanmean(np.array(prev_pos), axis=0)      
             now_pos_vec =  np.nanmean(np.array(now_pos), axis=0)
             distance = np.linalg.norm( now_pos_vec - prev_pos_vec )
-            if distance > 2*seg_len:
+            if distance > 2*seg_len or len(prev_pos) < 4 or len(now_pos) < 4:
                 tracklet[1] = frame_ind
                 data.append(tracklet)
                 tracklet = [frame_ind+1,-1,[]]
@@ -411,8 +411,11 @@ def track_data_processing(vidMD5):
                     if x0 is None or y0 is None:
                         print("Body part had NoneType", x0,y0)
                         continue
-                    pos_list.append( (x0,y0) )
-            pos = np.nanmean(np.array(pos_list), axis=0)    
+                    pos_list.append( [x0,y0] )
+            if len(pos_list) > 1:
+                pos = np.nanmean(np.array(pos_list), axis=0)
+            else:
+                continue
 
             cv2.circle(frame, (int(pos[0]),int(pos[1])), 16, (0, 94, 213), -1)
             cv2.putText(frame, indv, (int(pos[0]+16),int(pos[1]-16)), cv2.FONT_HERSHEY_SIMPLEX, 2, (115, 158, 0), 4, cv2.LINE_AA)
