@@ -10,9 +10,10 @@ torch.backends.nnpack.enabled = False
 
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
-SHUFFLE=5
+SHUFFLE=10
 DLC_CFG_PATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
 STEP_TIME = 0.1
+SKELETON= ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
 
 con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
 cur = con.cursor()
@@ -23,6 +24,27 @@ con.close()
 purgelist = [f'../data/intermediates/{entry}' for entry in os.listdir('../data/intermediates/') if entry != '.gitignore']
 for item in purgelist:
     os.remove(item)
+
+def get_body_pos_never_null_query_generator():
+    query = "SELECT \n"
+
+    for label_i in range(len(SKELETON)):
+        query += f"tb{label_i}.x_pos AS lb{label_i}_x, tb{label_i}.y_pos AS lb{label_i}_y,\n"
+    
+    query = query[:-2] + '\n'
+    query += "FROM labels AS tb0 \n"
+
+    for label_i in range(1,len(SKELETON)):
+        query += f"JOIN labels AS tb{label_i} ON tb{label_i}.frame_num = tb0.frame_num AND tb{label_i}.indiv = tb0.indiv "
+        query += f"AND tb{label_i}.bodypart = '{SKELETON[label_i]}' AND tb{label_i}.x_pos IS NOT NULL AND tb{label_i}.y_pos IS NOT NULL \n"
+    
+    query += "WHERE \n"
+    query += f"tb0.bodypart = '{SKELETON[0]}' AND \n"
+    query += "tb0.indiv = ? AND \n"
+    query += "tb0.x_pos IS NOT NULL AND \n"
+    query += "tb0.y_pos IS NOT NULL;"
+    # print(query)
+    return query
 
 def acquire_video_job():
     vidQ = None
@@ -107,7 +129,6 @@ def track_data_processing(vidMD5):
     parts_keys = lines[1].strip().split(',')[1:]
     numInd = len(set(individuals_keys))
 
-    parts_list = ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
     min_frame = -1
     max_frame = -1
 
@@ -143,50 +164,14 @@ def track_data_processing(vidMD5):
     for indv in [f"ind{i}" for i in range(1,numInd+1)]:
         # Calc len
         print(f"Calculating length of {indv} for {vidMD5}")
-        get_body_pos_never_null_query = '''
-        SELECT
-        head.x_pos         AS head_x,          head.y_pos         AS head_y,
-        p18.x_pos          AS eighth_x,        p18.y_pos           AS eighth_y,
-        p14.x_pos          AS quarter_x,       p14.y_pos           AS quarter_y,
-        p38.x_pos          AS three_eighths_x, p38.y_pos           AS three_eighths_y,
-        p12.x_pos          AS half_x,          p12.y_pos           AS half_y,
-        p58.x_pos          AS five_eighths_x,  p58.y_pos           AS five_eighths_y,
-        p34.x_pos          AS three_quarters_x,p34.y_pos           AS three_quarters_y,
-        p78.x_pos          AS seven_eighths_x, p78.y_pos           AS seven_eighths_y,
-        tail.x_pos         AS tail_x,          tail.y_pos          AS tail_y
-        FROM labels AS head
-        JOIN labels AS p18 ON p18.frame_num = head.frame_num AND p18.indiv = head.indiv AND p18.bodypart = '1/8_point' AND p18.x_pos IS NOT NULL AND p18.y_pos IS NOT NULL
-        JOIN labels AS p14 ON p14.frame_num = head.frame_num AND p14.indiv = head.indiv AND p14.bodypart = '1/4_point' AND p14.x_pos IS NOT NULL AND p14.y_pos IS NOT NULL
-        JOIN labels AS p38 ON p38.frame_num = head.frame_num AND p38.indiv = head.indiv AND p38.bodypart = '3/8_point' AND p38.x_pos IS NOT NULL AND p38.y_pos IS NOT NULL
-        JOIN labels AS p12 ON p12.frame_num = head.frame_num AND p12.indiv = head.indiv AND p12.bodypart = '1/2_point' AND p12.x_pos IS NOT NULL AND p12.y_pos IS NOT NULL
-        JOIN labels AS p58 ON p58.frame_num = head.frame_num AND p58.indiv = head.indiv AND p58.bodypart = '5/8_point' AND p58.x_pos IS NOT NULL AND p58.y_pos IS NOT NULL
-        JOIN labels AS p34 ON p34.frame_num = head.frame_num AND p34.indiv = head.indiv AND p34.bodypart = '3/4_point' AND p34.x_pos IS NOT NULL AND p34.y_pos IS NOT NULL
-        JOIN labels AS p78 ON p78.frame_num = head.frame_num AND p78.indiv = head.indiv AND p78.bodypart = '7/8_point' AND p78.x_pos IS NOT NULL AND p78.y_pos IS NOT NULL
-        JOIN labels AS tail ON tail.frame_num = head.frame_num AND tail.indiv = head.indiv AND tail.bodypart = 'tail' AND tail.x_pos IS NOT NULL AND tail.y_pos IS NOT NULL
-        WHERE
-        head.bodypart = 'head' AND
-        head.indiv = ? AND
-        head.x_pos IS NOT NULL AND head.x_pos = head.x_pos AND
-        head.y_pos IS NOT NULL AND head.y_pos = head.y_pos;
-        '''
-        points = [
-            "head",
-            "p18",
-            "p14",
-            "p38",
-            "p12",
-            "p58",
-            "p34",
-            "p78",
-            "tail"
-        ]
-        memCur.execute(get_body_pos_never_null_query, (indv,))
+
+        memCur.execute(get_body_pos_never_null_query_generator(), (indv,))
         rows = memCur.fetchall()
 
         lengths = []
         for row in rows:
             length = 0.0
-            for i in range(len(points) - 1):
+            for i in range(len(SKELETON) - 1):
                 x1, y1 = row[2 * i], row[2 * i + 1]
                 x2, y2 = row[2 * (i + 1)], row[2 * (i + 1) + 1]
                 length += math.hypot( x1 - x2, y1 - y2)
@@ -197,119 +182,8 @@ def track_data_processing(vidMD5):
             continue
         indv_len = np.median(lengths)
 
-        seg_len = indv_len / (len(points)-1)
+        seg_len = indv_len / (len(SKELETON)-1)
 
-        
-        # unflip points
-        for frame_ind in range(min_frame,max_frame):
-            for px in range(int(len(points)/2)):
-                p1 = points[px]
-                p2 = points[len(points)-px-1]
-                
-                p1t0Q = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p1, indv]).fetchone()
-                p2t0Q = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p2, indv]).fetchone()
-                p1t1Q = memCur.execute(f"SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p1, indv]).fetchone()
-                p2t1Q = memCur.execute(f"SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p2, indv]).fetchone()
-
-                if not (p1t0Q and p2t0Q and None not in p1t0Q and None not in p2t0Q):
-                    continue
-
-                p1t0_x, p1t0_y = p1t0Q
-                p2t0_x, p2t0_y = p2t0Q
-
-                if p1t1Q and p2t1Q and None not in p1t1Q and None not in p2t1Q:
-                    p1t1_x, p1t1_y, p1t1_conf = p1t1Q
-                    p2t1_x, p2t1_y, p2t1_conf = p2t1Q
-                    if (math.hypot(p1t0_x - p1t1_x, p1t0_y - p1t1_y) > 0.25 * seg_len) \
-                    and (math.hypot(p1t0_x - p2t1_x, p1t0_y - p2t1_y) < 0.25 * seg_len) \
-                    and (math.hypot(p2t0_x - p2t1_x, p2t0_y - p2t1_y) > 0.25 * seg_len) \
-                    and (math.hypot(p2t0_x - p1t1_x, p2t0_y - p1t1_y) < 0.25 * seg_len):
-                        memCur.execute(f"UPDATE labels SET x_pos = ?, y_pos = ?, confidence = ? WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2t1_x,p2t1_y,p2t1_conf,frame_ind+1, p1, indv])
-                        memCur.execute(f"UPDATE labels SET x_pos = ?, y_pos = ?, confidence = ? WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1t1_x,p1t1_y,p1t1_conf,frame_ind+1, p2, indv])
-                        memCon.commit()
-                elif p1t1Q and None not in p1t1Q:
-                    p1t1_x, p1t1_y, p1t1_conf = p1t1Q
-                    if (math.hypot(p1t0_x - p1t1_x, p1t0_y - p1t1_y) > 0.25 * seg_len) \
-                    and (math.hypot(p1t0_x - p2t0_x, p1t0_y - p2t0_y) > seg_len) \
-                    and (math.hypot(p2t0_x - p1t1_x, p2t0_y - p1t1_y) < 0.25 * seg_len):
-                        memCur.execute(f"UPDATE labels SET bodypart = ? WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p2, frame_ind+1, p1, indv])
-                        memCon.commit()
-                elif p2t1Q and None not in p2t1Q:
-                    p2t1_x, p2t1_y, p2t1_conf = p2t1Q
-                    if (math.hypot(p2t0_x - p2t1_x, p2t0_y - p2t1_x) > 0.25 * seg_len) \
-                    and (math.hypot(p1t0_x - p2t0_x, p1t0_y - p2t0_y) > seg_len) \
-                    and (math.hypot(p1t0_x - p2t1_x, p1t0_y - p2t1_y) < 0.25 * seg_len):
-                        memCur.execute(f"UPDATE labels SET bodypart = ? WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [p1, frame_ind+1, p2, indv])
-                        memCon.commit()
-        
-        """
-        # Vote on forward direction (Set direction of movement as head)
-        for frame_ind in range(min_frame+1,max_frame+1):
-            flip_vote = 0
-            for p_i in range(1,len(points)-1):
-                p_a = points[p_i-1]
-                p_b = points[p_i]
-                p_c = points[p_i+1]
-
-                paQ_t0 = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind-1, p_a, indv]).fetchone()
-                pbQ_t0 = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind-1, p_b, indv]).fetchone()
-                pbQ_t1 = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_b, indv]).fetchone()
-                pcQ_t0 = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind-1, p_c, indv]).fetchone()
-
-                if (paQ_t0 and pbQ_t0 and pcQ_t0 and pbQ_t1) and (None not in paQ_t0 and None not in pbQ_t0 and None not in pcQ_t0 and None not in pbQ_t1):
-                    pa_x, pa_y = paQ
-                    pb_t0_x, pb_t0_y = pbQ
-                    pb_t1_x, pb_t1_y = pbQ
-                    pc_x, pc_y, = pcQ
-
-                    va = np.array((pa_x-pb_t0_x,pa_y-pb_t0_y)) / np.linalg.norm((pa_x-pb_t0_x,pa_y-pb_t0_y))
-                    vc =  np.array((pc_x-pb_t0_x,pc_x-pb_t0_y)) / np.linalg.norm((pa_x-pb_t0_x,pa_y-pb_t0_y))
-                    vb = (pb_t1_x-pb_t0_x,pb_t1_y-pb_t0_y)
-
-                    if np.dot(va, vb) > np.dot(vc, vb):
-                        flip_vote += 1
-                    else:
-                        flip_vote -= 1
-            if flip_vote > 2:
-                print("\nFLIP VOTE!\n")
-                for p_i in range(len(points)):
-                    memCur.execute(f"UPDATE labels SET(bodypart) VALUES(?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [points[len(points)-1-p_i]+"_f", frame_ind, points[p_i], indv])
-                for p_i in range(len(points)):
-                    memCur.execute(f"UPDATE labels SET(bodypart) VALUES(?) WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [points[p_i], frame_ind, points[p_i]+"_f", indv])
-
-        # Delete labels that create impossible body segments
-        for frame_ind in range(min_frame,max_frame):
-            for p_i in range(1,len(points)-1):
-                p_a = points[p_i-1]
-                p_b = points[p_i]
-                p_c = points[p_i+1]
-
-                paQ = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_a, indv]).fetchone()
-                pbQ = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_b, indv]).fetchone()
-                pcQ = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_c, indv]).fetchone()
-
-                if (paQ and pbQ and pcQ) and (None not in paQ and None not in pbQ and None not in pcQ):
-                    pa_x, pa_y, = paQ
-                    pb_x, pb_y, = pbQ
-                    pc_x, pc_y, = pcQ
-                    if math.hypot(pb_x, pb_y, pa_x, pa_y) + math.hypot(pb_x, pb_y, pc_x, pc_y) > 4 * seg_len or math.hypot(pb_x, pb_y, pa_x, pa_y) > 2.5 * seg_len:
-                        memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p_b, indv]) # Deleting points should cut apart bad tracklets
-                        memCon.commit()
-                
-        # Delete label jumps to cut apart bad tracklets
-        for frame_ind in range(min_frame,max_frame):
-            for p in points:
-                pt0Q = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind, p, indv]).fetchone()
-                pt1Q = memCur.execute(f"SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p, indv]).fetchone()
-
-                if not (pt0Q and pt1Q and None not in pt0Q and None not in pt1Q):
-                    continue
-                pt0_x, pt0_y, = pt0Q
-                pt1_x, pt1_y, = pt1Q
-                if (math.hypot(pt0_x, pt0_y, pt1_x, pt1_y) > 0.5 * seg_len): # Points cannot jump half a segment length per frame
-                    memCur.execute(f"DELETE FROM labels WHERE frame_num = ? AND bodypart = ? AND indiv = ?", [frame_ind+1, p, indv]) # Deleting points should cut apart bad tracklets
-                    memCon.commit()
-        """
 
         #Calc speed
         video_path = os.path.abspath(f"../data/ingest/videos/{vidMD5}.mp4")
@@ -322,7 +196,7 @@ def track_data_processing(vidMD5):
         for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
             prev_pos = []
             now_pos = []
-            for bodypart in parts_list[1:-1]: # Ignore ends of the worms
+            for bodypart in SKELETON[1:-1]: # Ignore ends of the worms
                 prev_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
                 if prev_q is not None and None not in prev_q:
                     prev_pos.append(prev_q)
@@ -353,7 +227,7 @@ def track_data_processing(vidMD5):
         if np.isnan(speed):
             print(f"The speed of {indv} for {vidMD5} was NaN.")
             raise ValueError
-        elif len(longest_tracklet[2]) <  len(range(min_frame+step_size,max_frame+1,step_size))/4:
+        elif len(longest_tracklet[2]) <  (fps*4)//step_size: # Must be 3 seconds long
             print(f"The longest tracklet of {indv} for {vidMD5} did not meet length threshold")
             continue
         print("Assigning confidence value.")
@@ -400,11 +274,9 @@ def track_data_processing(vidMD5):
     for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
         src_video.set(cv2.CAP_PROP_POS_FRAMES, frame_ind)
         ret, frame = src_video.read()
-        for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1]),label_ind_bounds)]:
-            parts_list = ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
-            
+        for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1]),label_ind_bounds)]
             pos_list = []
-            for part in parts_list[1:-1]:
+            for part in SKELETON:
                 pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
                 if pointQ is not None:
                     x0,y0 = pointQ
@@ -478,15 +350,15 @@ while True:
                     dlc_track_data_generation(vidMD5, None)
                 
                 track_data_processing(vidMD5)
-            except ValueError:
-                print("detector failed")
+            except ValueError as e:
+                print(f"detector failed, {e}")
                 cleanup(vidMD5)
                 if attempt == 2:
                     mark_failed(vidMD5)
                     raise ValueError
-            except OSError:
+            except OSError as e:
                 mark_failed(vidMD5)
-                print("detector failed")
+                print(f"detector failed, {e}")
                 cleanup(vidMD5)
                 if attempt == 2:
                     mark_failed(vidMD5)
