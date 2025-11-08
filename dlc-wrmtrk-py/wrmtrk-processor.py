@@ -14,6 +14,7 @@ SHUFFLE=10
 DLC_CFG_PATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
 STEP_TIME = 0.1
 SKELETON= ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
+TRACK_METHOD = 'box'
 
 con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
 cur = con.cursor()
@@ -73,11 +74,10 @@ def dlc_track_data_generation(vidMD5, numInd):
     dlc.analyze_videos(DLC_CFG_PATH, [video_path], videotype='.mp4', save_as_csv=True, use_shelve=False,
         shuffle=SHUFFLE, destfolder='../data/intermediates', n_tracks=numInd)
     
-
     dlc.create_labeled_video(DLC_CFG_PATH, [video_path], videotype='mp4', 
                             shuffle=SHUFFLE, fastmode=True, displayedbodyparts='all', 
                             displayedindividuals='all', codec='mp4v', 
-                            destfolder=os.path.abspath(f"../data/intermediates"), draw_skeleton=False, color_by='bodypart', track_method='box')
+                            destfolder=os.path.abspath(f"../data/intermediates"), draw_skeleton=False, color_by='bodypart', track_method=TRACK_METHOD)
 
 
 def track_data_processing(vidMD5):
@@ -195,23 +195,39 @@ def track_data_processing(vidMD5):
         tracklet = [0,-1,[]]
         for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
             entry = []
-            for bodypart in parts_list[1:-1]: # Ignore ends of the worms
+            for bodypart_index in range(1, len(SKELETON)-1): # Ignore ends of the worms
+                bodypart =  SKELETON[bodypart_index]
+                bodypart_pred =  SKELETON[bodypart_index-1]
+
                 x_pos_prev = np.NaN
                 y_pos_prev = np.NaN
                 prev_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
                 if prev_q is not None:
                     x_pos_prev = prev_q[0]
                     y_pos_prev = prev_q[1]
+
                 x_pos_now = np.NaN
                 y_pos_now = np.NaN
                 now_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind, indv, bodypart) ).fetchone()
                 if now_q is not None:
                     x_pos_now = now_q[0]
                     y_pos_now = now_q[1]
-                if None in [x_pos_prev, y_pos_prev, x_pos_now, y_pos_now]:
+                
+                x_pos_pred_prev = np.NaN
+                y_pos_pred_prev = np.NaN
+                pred_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart_pred) ).fetchone()
+                if now_q is not None:
+                    x_pos_pred_prev = pred_q[0]
+                    y_pos_pred_prev = pred_q[1]
+                
+                if None in [x_pos_prev, y_pos_prev, x_pos_now, y_pos_now, x_pos_pred_prev, y_pos_pred_prev]:
                     distance = np.NaN
                 else:
-                    distance = math.hypot(x_pos_now - x_pos_prev, y_pos_now - y_pos_prev)
+                    pos_prev = np.array( [x_pos_prev, y_pos_prev] )
+                    pos_now = np.array( [x_pos_prev, y_pos_prev] )
+                    pos_pred_prev = np.array( [x_pos_pred_prev, y_pos_pred_prev] )
+
+                    distance = np.linalg.norm(pos_now-pos_prev) * np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now) ) / abs(np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now)))
                 if distance > seg_len*2:
                     distance = np.NaN
                 entry.append(distance)
@@ -220,7 +236,7 @@ def track_data_processing(vidMD5):
                 data.append(tracklet)
                 tracklet = [frame_ind+1,-1,[]]
             else:
-                pruned_entry = [x if abs(x - np.median(entry)) < 1.5 * np.std(entry) else np.NaN for x in entry ]
+                pruned_entry = [x if abs(x - np.median(entry)) < 1.5 * np.std(entry) and x > 0 else np.NaN for x in entry ]
                 tracklet[2].append(pruned_entry)
         tracklet[1] = range(min_frame+step_size,max_frame+1,step_size)[-1]
         data.append(tracklet)
@@ -237,7 +253,7 @@ def track_data_processing(vidMD5):
         if np.isnan(speed):
             print(f"The speed of {indv} for {vidMD5} was NaN.")
             raise ValueError
-        elif len(longest_tracklet[2]) <  (fps*4)//step_size: # Must be 3 seconds long
+        elif len(longest_tracklet[2]) <  (fps*3)//step_size: # Must be 3 seconds long
             print(f"The longest tracklet of {indv} for {vidMD5} did not meet length threshold")
             continue
         print("Assigning confidence value.")
@@ -292,10 +308,10 @@ def track_data_processing(vidMD5):
                 continue
             cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (115, 158, 0), 4)
             cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 2, (115, 158, 0), 4, cv2.LINE_AA)
-            parts_list = ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
-            for i in range(2,len(parts_list)-1):
-                pointQ1 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i-1]]).fetchone()
-                pointQ2 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, parts_list[i]]).fetchone()
+
+            for i in range(2,len(SKELETON)-1):
+                pointQ1 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, SKELETON[i-1]]).fetchone()
+                pointQ2 = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, SKELETON[i]]).fetchone()
                 if pointQ1 is not None and pointQ2 is not None:
                     x0,y0 = pointQ1
                     x1,y1 = pointQ2
@@ -303,14 +319,14 @@ def track_data_processing(vidMD5):
                         print("Body part segment had NoneType", x0,y0,x1,y1)
                         continue
                     cv2.line(frame, (int(x0),int(y0)), (int(x1),int(y1)), (115, 158, 0), 4)
-            for part in parts_list[1:-1]:
+            for part in SKELETON[1:-1]:
                 pointQ = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', [frame_ind, indv, part]).fetchone()
                 if pointQ is not None:
                     x0,y0 = pointQ
                     if x0 is None or y0 is None:
                         print("Body part had NoneType", x0,y0)
                         continue
-                    if part == '1/8_point':
+                    if part == SKELETON[0]:
                         cv2.circle(frame, (int(x0),int(y0)), 16, (0, 94, 213), -1)
                     else:
                         cv2.circle(frame, (int(x0),int(y0)), 16, (115, 158, 0), -1)
