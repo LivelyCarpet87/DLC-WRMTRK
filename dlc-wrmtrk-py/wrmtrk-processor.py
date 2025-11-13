@@ -10,11 +10,11 @@ torch.backends.nnpack.enabled = False
 
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
-SHUFFLE=10
-DLC_CFG_PATH = os.path.abspath("../data/DLC/dlc_project_stripped/config.yaml")
+SHUFFLE=2
+DLC_CFG_PATH = os.path.abspath("/home/biosci/Documents/DLC-WrmTrk-Tyllis Xu-2025-10-25/config.yaml")
 STEP_TIME = 0.1
-SKELETON= ['head', '1/8_point', '1/4_point', '3/8_point', '1/2_point', '5/8_point', '3/4_point', '7/8_point', 'tail']
-TRACK_METHOD = 'box'
+SKELETON= ['pharynx-tip', 'pharynx-end', '1/4-point', '3/8-point', 'midpoint', '5/8-point', '3/4-point', '7/8-point', 'tail-tip']
+TRACK_METHOD = 'skeleton'
 
 con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
 cur = con.cursor()
@@ -167,6 +167,7 @@ def track_data_processing(vidMD5):
 
         memCur.execute(get_body_pos_never_null_query_generator(), (indv,))
         rows = memCur.fetchall()
+        print(f"Got {len(rows)} perfect frames...")
 
         lengths = []
         for row in rows:
@@ -224,10 +225,12 @@ def track_data_processing(vidMD5):
                     distance = np.NaN
                 else:
                     pos_prev = np.array( [x_pos_prev, y_pos_prev] )
-                    pos_now = np.array( [x_pos_prev, y_pos_prev] )
+                    pos_now = np.array( [x_pos_now, y_pos_now] )
                     pos_pred_prev = np.array( [x_pos_pred_prev, y_pos_pred_prev] )
-
-                    distance = np.linalg.norm(pos_now-pos_prev) * np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now) ) / abs(np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now)))
+                    
+                    distance = np.linalg.norm(pos_now-pos_prev)
+                    if np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now) ) < 0:
+                        distance *= -1
                 if distance > seg_len*2:
                     distance = np.NaN
                 entry.append(distance)
@@ -247,8 +250,7 @@ def track_data_processing(vidMD5):
         if len(longest_tracklet[2]) == 0:
             print(f"The longest tracklet of {indv} for {vidMD5} was empty.")
             raise ValueError
-        pruned_tracklet =  [x if abs(x - np.nanmedian(longest_tracklet[2])) < 1.5 * np.nanstd(longest_tracklet[2]) else np.NaN for x in longest_tracklet[2] ]
-        speed = np.nanmean(np.array(pruned_tracklet))/step_size*fps
+        speed = np.nanmean(np.array(longest_tracklet[2]))/step_size*fps
         print("Testing speed is a valid value.")
         if np.isnan(speed):
             print(f"The speed of {indv} for {vidMD5} was NaN.")
@@ -326,7 +328,7 @@ def track_data_processing(vidMD5):
                     if x0 is None or y0 is None:
                         print("Body part had NoneType", x0,y0)
                         continue
-                    if part == SKELETON[0]:
+                    if part == SKELETON[1]:
                         cv2.circle(frame, (int(x0),int(y0)), 16, (0, 94, 213), -1)
                     else:
                         cv2.circle(frame, (int(x0),int(y0)), 16, (115, 158, 0), -1)
