@@ -75,11 +75,12 @@ def dlc_track_data_generation(vidMD5, numInd):
     dlc.analyze_videos(DLC_CFG_PATH, [video_path], videotype='.mp4', save_as_csv=True, use_shelve=False,
         shuffle=SHUFFLE, destfolder='../data/intermediates', n_tracks=numInd)
     
+    """
     dlc.create_labeled_video(DLC_CFG_PATH, [video_path], videotype='mp4', 
                             shuffle=SHUFFLE, fastmode=True, displayedbodyparts='all', 
                             displayedindividuals='all', codec='mp4v', 
                             destfolder=os.path.abspath(f"../data/intermediates"), draw_skeleton=False, color_by='bodypart', track_method=TRACK_METHOD)
-
+    """
 
 def track_data_processing(vidMD5):
     print(f"Post processing {vidMD5}")
