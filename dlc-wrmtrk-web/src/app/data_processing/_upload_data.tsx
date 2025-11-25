@@ -76,6 +76,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
   const [normImg, setNormImg] = useState(null as null|File);
   const [conditions, setConditions] = useState([] as string[]);
   const [warnMsg, setWarnMsg] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
@@ -170,6 +171,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
         body: plateFormData
     });
 
+    setUploading(true);
     for (const ind in videoTiles) {
       const vid_uuid = videoTiles[ind];
       if (videos.get(vid_uuid) === undefined) {
@@ -196,6 +198,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
     } else {
         console.log("Plate submission failed.", body);
     }
+    setUploading(false)
 
   }
 
@@ -249,12 +252,12 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
 
       <div className="grid grid-cols-2 gap-4">
         <Tooltip label="Can resubmit to update information." openDelay={700}>
-          <Button className="bg-green-700" onClick={submitPlate}>
+          <Button className="bg-green-700" onClick={submitPlate} disabled={uploading}>
             Submit For Processing
           </Button>
         </Tooltip>
         <Tooltip label="This does not delete submitted data." openDelay={700}>
-          <Button className="bg-red-700" onClick={() => onDelete(uuid) }>
+          <Button className="bg-red-700" onClick={() => onDelete(uuid) } disabled={uploading}>
             Delete Plate Locally
           </Button>
         </Tooltip>
