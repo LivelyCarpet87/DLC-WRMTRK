@@ -5,6 +5,7 @@ import deeplabcut as dlc
 import numpy as np
 import cv2
 import torch
+from multiprocessing import Pool
 
 torch.backends.nnpack.enabled = False
 
@@ -373,39 +374,43 @@ def cleanup(vidMD5):
     for item in purgelist:
         os.remove(item)
 
-while True:
-    vidMD5, numInd = acquire_video_job()
-    print(f'Found job: {vidMD5}')
-    try:
-        for attempt in range(4):
-            try:
-                if attempt == 0:
-                    dlc_track_data_generation(vidMD5, numInd)
-                elif attempt == 1:
-                    if numInd - 1 < 1:
+def core_loop(_):
+    while True:
+        vidMD5, numInd = acquire_video_job()
+        print(f'Found job: {vidMD5}')
+        try:
+            for attempt in range(4):
+                try:
+                    if attempt == 0:
+                        dlc_track_data_generation(vidMD5, numInd)
+                    elif attempt == 1:
+                        if numInd - 1 < 1:
+                            raise ValueError
+                        dlc_track_data_generation(vidMD5, numInd-1)
+                    elif attempt == 2:
+                        dlc_track_data_generation(vidMD5, numInd+1)
+                    elif attempt == 3:
+                        dlc_track_data_generation(vidMD5, None)
+                    
+                    track_data_processing(vidMD5)
+                except ValueError as e:
+                    print(f"detector failed, {e}")
+                    cleanup(vidMD5)
+                    if attempt == 2:
+                        mark_failed(vidMD5)
                         raise ValueError
-                    dlc_track_data_generation(vidMD5, numInd-1)
-                elif attempt == 2:
-                    dlc_track_data_generation(vidMD5, numInd+1)
-                elif attempt == 3:
-                    dlc_track_data_generation(vidMD5, None)
-                
-                track_data_processing(vidMD5)
-            except ValueError as e:
-                print(f"detector failed, {e}")
-                cleanup(vidMD5)
-                if attempt == 2:
+                except OSError as e:
                     mark_failed(vidMD5)
-                    raise ValueError
-            except OSError as e:
-                mark_failed(vidMD5)
-                print(f"detector failed, {e}")
-                cleanup(vidMD5)
-                if attempt == 2:
-                    mark_failed(vidMD5)
-                    raise ValueError
-    except ValueError:
-        mark_failed(vidMD5)
-    cleanup(vidMD5)
+                    print(f"detector failed, {e}")
+                    cleanup(vidMD5)
+                    if attempt == 2:
+                        mark_failed(vidMD5)
+                        raise ValueError
+        except ValueError:
+            mark_failed(vidMD5)
+        cleanup(vidMD5)
 
-    
+        
+if __name__ == '__main__':
+    with Pool(4) as mp:
+        mp.map(core_loop, range(4))
