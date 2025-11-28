@@ -260,7 +260,7 @@ def track_data_processing(vidMD5):
         elif len(longest_tracklet[2]) <  (fps*3)//step_size: # Must be 3 seconds long
             print(f"The longest tracklet of {indv} for {vidMD5} did not meet minimum length")
             continue
-        elif len(longest_tracklet[2]) <  (max_frame-min_frame-step_size)*0.6:
+        elif longest_tracklet[1] - longest_tracklet[0] < (max_frame-min_frame-step_size)*0.55:
             print(f"The longest tracklet of {indv} for {vidMD5} did not meet length threshold")
             continue
         print("Assigning confidence value.")
