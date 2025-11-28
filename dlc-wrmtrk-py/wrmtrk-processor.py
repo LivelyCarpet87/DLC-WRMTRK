@@ -222,17 +222,24 @@ def track_data_processing(vidMD5):
                 if now_q is not None:
                     x_pos_pred_prev = pred_q[0]
                     y_pos_pred_prev = pred_q[1]
-                
+
                 if None in [x_pos_prev, y_pos_prev, x_pos_now, y_pos_now, x_pos_pred_prev, y_pos_pred_prev]:
                     distance = np.NaN
                 else:
-                    pos_prev = np.array( [x_pos_prev, y_pos_prev] )
-                    pos_now = np.array( [x_pos_now, y_pos_now] )
-                    pos_pred_prev = np.array( [x_pos_pred_prev, y_pos_pred_prev] )
-                    
-                    distance = np.linalg.norm(pos_now-pos_prev)
-                    if np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now) ) < 0:
-                        distance *= -1
+                    shadow_parts_q = memCur.execute('SELECT indiv FROM labels WHERE frame_num = ? AND indiv < ? AND bodypart = ? '+
+                                                         'AND x_pos between ? and ? AND y_pos between ? and ?', 
+                                                         (frame_ind-step_size, indv, bodypart, 
+                                                          x_pos_now-0.5*seg_len,x_pos_now+0.5*seg_len, y_pos_now-0.5*seg_len,y_pos_now+0.5*seg_len  ) 
+                                                         ).fetchall()
+                    if len(shadow_parts_q) > 0: distance = np.NaN
+                    else:
+                        pos_prev = np.array( [x_pos_prev, y_pos_prev] )
+                        pos_now = np.array( [x_pos_now, y_pos_now] )
+                        pos_pred_prev = np.array( [x_pos_pred_prev, y_pos_pred_prev] )
+                        
+                        distance = np.linalg.norm(pos_now-pos_prev)
+                        if np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now) ) < 0:
+                            distance *= -1
                 if distance > seg_len*2:
                     distance = np.NaN
                 entry.append(distance)
