@@ -21,6 +21,14 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
         return pauseRef.current
     }
     const videoSWR = useSWR( ['/api/videos', md5], ([url, md5]) => fetchWithToken(url, md5),{ refreshInterval: 10000, keepPreviousData: true, isPaused: ifPause});
+    
+    const proc_state = videoSWR.data?.proc_state;
+    useEffect(() => {
+        if (proc_state === "done" || proc_state === "warning" || proc_state === "error" || proc_state === "failed") {
+            pauseRef.current = true;
+        }
+    }, [proc_state]);
+
     if (videoSWR.data === undefined && (videoSWR.isLoading || videoSWR.isValidating)) {
         return (
             <div className="bg-slate-100 rounded-md p-3 flex flex-col gap-4 w-80">
@@ -33,7 +41,6 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
         );
     }
 
-    const proc_state = videoSWR.data?.proc_state;
     let proc_indicator = <Loader color="gray" type="bars" size="xs" />;
     if (proc_state == "pending"){
         proc_indicator = (<Loader color="gray" type="bars" size="xs" />);
@@ -81,12 +88,6 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
             </Tooltip>
         );
     }
-
-    useEffect(() => {
-        if (proc_state === "done" || proc_state === "warning" || proc_state === "error" || proc_state === "failed") {
-            pauseRef.current = true;
-        }
-    }, [proc_state]);
 
     let dataDisplay = <></>;
     if (proc_state == "done" || proc_state == "warning"){
