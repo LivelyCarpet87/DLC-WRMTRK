@@ -2,7 +2,7 @@
 
 import { Title, Button, CopyButton, Table, Loader, Skeleton, Pill, Tooltip } from "@mantine/core";
 import { UUID } from "crypto";
-import { MutableRefObject, useRef, memo } from "react";
+import { MutableRefObject, useRef, memo, useEffect } from "react";
 import useSWR from "swr";
 
 
@@ -33,7 +33,7 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
         );
     }
 
-    const proc_state = videoSWR.data.proc_state;
+    const proc_state = videoSWR.data?.proc_state;
     let proc_indicator = <Loader color="gray" type="bars" size="xs" />;
     if (proc_state == "pending"){
         proc_indicator = (<Loader color="gray" type="bars" size="xs" />);
@@ -49,7 +49,6 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
             </Tooltip>
         );
     } else if (proc_state == "warning"){
-        pauseRef.current = true;
         proc_indicator = (
             <Tooltip label="Slight inconsistencies detected during processing." openDelay={700}>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6 text-blue-800">
@@ -58,7 +57,6 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
             </Tooltip>
         );
     } else if (proc_state == "error"){
-        pauseRef.current = true;
         proc_indicator = (
             <Tooltip label="Extreme inconsistencies created during processing." openDelay={700}>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6 text-yellow-700">
@@ -67,7 +65,6 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
             </Tooltip>
         );
     } else if (proc_state == "failed"){
-        pauseRef.current = true;
         proc_indicator = (
             <Tooltip label="Video failed to process." openDelay={700}>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6 text-red-800">
@@ -84,6 +81,12 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
             </Tooltip>
         );
     }
+
+    useEffect(() => {
+        if (proc_state === "done" || proc_state === "warning" || proc_state === "error" || proc_state === "failed") {
+            pauseRef.current = true;
+        }
+    }, [proc_state]);
 
     let dataDisplay = <></>;
     if (proc_state == "done" || proc_state == "warning"){
