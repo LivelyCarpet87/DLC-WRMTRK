@@ -264,7 +264,7 @@ def track_data_processing(vidMD5):
         if np.isnan(speed):
             print(f"The speed of {indv} for {vidMD5} was NaN.")
             raise ValueError
-        elif len(longest_tracklet[2]) <  (fps*3)//step_size: # Must be 3 seconds long
+        elif len(longest_tracklet[2]) <  (fps*5)//step_size: # Must be 5 seconds long
             print(f"The longest tracklet of {indv} for {vidMD5} did not meet minimum length")
             continue
         elif longest_tracklet[1] - longest_tracklet[0] < (max_frame-min_frame-step_size)*0.55:
