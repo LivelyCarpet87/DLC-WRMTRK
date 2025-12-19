@@ -194,27 +194,28 @@ def track_data_processing(vidMD5):
         fps = src_video.get(cv2.CAP_PROP_FPS)
         step_size = int(fps*STEP_TIME)+1
         data = []
-        print(f"Calculating possible tracklets of {indv} for {vidMD5}")
-        tracklet = [0,-1,[]]
-        for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
+        for frame_ind in range(min_frame+step_size,max_frame+1):
             entry = []
             for bodypart_index in range(1, len(SKELETON)-1): # Ignore ends of the worms
                 bodypart =  SKELETON[bodypart_index]
                 bodypart_pred =  SKELETON[bodypart_index-1]
+                confidence = 0
 
                 x_pos_prev = np.NaN
                 y_pos_prev = np.NaN
-                prev_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
+                prev_q = memCur.execute('SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
                 if prev_q is not None:
                     x_pos_prev = prev_q[0]
                     y_pos_prev = prev_q[1]
+                    confidence += prev_q[2] / 2
 
                 x_pos_now = np.NaN
                 y_pos_now = np.NaN
-                now_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind, indv, bodypart) ).fetchone()
+                now_q = memCur.execute('SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind, indv, bodypart) ).fetchone()
                 if now_q is not None:
                     x_pos_now = now_q[0]
                     y_pos_now = now_q[1]
+                    confidence += now_q[2] / 2
                 
                 x_pos_pred_prev = np.NaN
                 y_pos_pred_prev = np.NaN
@@ -225,6 +226,7 @@ def track_data_processing(vidMD5):
 
                 if None in [x_pos_prev, y_pos_prev, x_pos_now, y_pos_now, x_pos_pred_prev, y_pos_pred_prev]:
                     distance = np.NaN
+                    confidence = 0
                 else:
                     shadow_parts_q = memCur.execute('SELECT indiv FROM labels WHERE frame_num = ? AND indiv < ? AND bodypart = ? '+
                                                          'AND x_pos between ? and ? AND y_pos between ? and ?', 
@@ -242,40 +244,30 @@ def track_data_processing(vidMD5):
                             distance *= -1
                 if distance > seg_len*2:
                     distance = np.NaN
-                entry.append(distance)
-            if np.isnan(np.array(entry)).sum() > 2:
-                tracklet[1] = frame_ind
-                data.append(tracklet)
-                tracklet = [frame_ind+1,-1,[]]
-            else:
-                pruned_entry = [x if abs(x - np.median(entry)) < 1.5 * np.std(entry) and x > 0 else np.NaN for x in entry ]
-                tracklet[2].append(pruned_entry)
-        tracklet[1] = range(min_frame+step_size,max_frame+1,step_size)[-1]
-        data.append(tracklet)
+                    confidence = 0
+                data.append([distance, confidence])
 
-        longest_tracklet = max(data, key=lambda x: x[1]-x[0])
-
+        weighted_avg_distance = 0
+        sum_weights = 0
+        for d, p in data:
+            if not np.isnan(d) and p > 0:
+                weighted_avg_distance += d*p
+                sum_weights += p
+        
         print(f"Calculating speed of {indv} for {vidMD5}")
-        if len(longest_tracklet[2]) == 0:
+        if sum_weights == 0:
             print(f"The longest tracklet of {indv} for {vidMD5} was empty.")
             raise ValueError
-        speed = np.nanmean(np.array(longest_tracklet[2]))/step_size*fps
+        speed = (weighted_avg_distance/sum_weights) /step_size*fps
         print("Testing speed is a valid value.")
         if np.isnan(speed):
             print(f"The speed of {indv} for {vidMD5} was NaN.")
             raise ValueError
-        elif len(longest_tracklet[2]) <  (fps*5)//step_size: # Must be 5 seconds long
-            print(f"The longest tracklet of {indv} for {vidMD5} did not meet minimum length")
-            continue
-        elif longest_tracklet[1] - longest_tracklet[0] < (max_frame-min_frame-step_size)*0.55:
-            print(f"The longest tracklet of {indv} for {vidMD5} did not meet length threshold")
-            continue
         print("Assigning confidence value.")
         confidence = True
-        if longest_tracklet[1] - longest_tracklet[0] < (max_frame-min_frame-step_size)*0.75:
-            print(f"Length for longest tracklet of {indv} for {vidMD5} was too short for confidence. {longest_tracklet[1] - longest_tracklet[0]} < {(max_frame-min_frame-step_size)/3}")
-            confidence = False
-        speed_data.append( (indv,speed,confidence, longest_tracklet[0:2]) )
+        if sum_weights/ len(data)< 0.7:
+            confidence=False
+        speed_data.append( (indv,speed,confidence) )
     
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
@@ -301,11 +293,6 @@ def track_data_processing(vidMD5):
     con.close()
 
     # Make labeled video
-    label_ind_bounds = []
-    for v in speed_data:
-        indv,_,_,bounds = v
-        label_ind_bounds.append([indv,bounds])
-    
     out_video = cv2.VideoWriter(f'../data/outputs/{vidMD5}_labeled.mp4', 
                                 cv2.VideoWriter_fourcc(*'mp4v'), 
                                 fps / step_size, 
@@ -314,7 +301,7 @@ def track_data_processing(vidMD5):
     for frame_ind in range(min_frame+step_size,max_frame+1,step_size):
         src_video.set(cv2.CAP_PROP_POS_FRAMES, frame_ind)
         ret, frame = src_video.read()
-        for indv in [x[0] for x in filter(lambda x: frame_ind in range(x[1][0],x[1][1]),label_ind_bounds)]:
+        for indv in [f"ind{i}" for i in range(1,numInd+1)]:
             x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             if x0 is None or y0 is None or x1 is None or y1 is None:
