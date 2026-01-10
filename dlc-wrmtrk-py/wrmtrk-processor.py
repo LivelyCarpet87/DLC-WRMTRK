@@ -11,11 +11,11 @@ torch.backends.nnpack.enabled = False
 
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
-SHUFFLE=2
-DLC_CFG_PATH = os.path.abspath("/home/biosci/Documents/DLC-WrmTrk-Tyllis Xu-2025-10-25/config.yaml")
+SHUFFLE=3
+DLC_CFG_PATH = os.path.abspath("/home/livelycarpet87/Documents/DLC-WrmTrk-Tyllis Xu-2025-10-25/config.yaml")
 STEP_TIME = 0.1
 SKELETON= ['pharynx-tip', 'pharynx-end', '1/4-point', '3/8-point', 'midpoint', '5/8-point', '3/4-point', '7/8-point', 'tail-tip']
-TRACK_METHOD = 'skeleton'
+TRACK_METHOD = 'box'
 
 con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
 cur = con.cursor()
@@ -186,60 +186,8 @@ def track_data_processing(vidMD5):
             print(f"Unable to acquire median length for {indv} of {vidMD5}")
             continue
         indv_lens[indv] = np.median(lengths)
+        print(indv_lens[indv])
         speed_data[indv] = []
-
-    """
-        #Calc speed
-        data = []
-        for frame_ind in range(min_frame+step_size,max_frame+1):
-            entry = []
-            
-
-        weighted_avg_distance = 0
-        sum_weights = 0
-        for d, p in data:
-            if not np.isnan(d) and p > 0:
-                weighted_avg_distance += d*p
-                sum_weights += p
-        
-        print(f"Calculating speed of {indv} for {vidMD5}")
-        if sum_weights == 0:
-            print(f"The longest tracklet of {indv} for {vidMD5} was empty.")
-            raise ValueError
-        speed = (weighted_avg_distance/sum_weights) /step_size*fps
-        print("Testing speed is a valid value.")
-        if np.isnan(speed):
-            print(f"The speed of {indv} for {vidMD5} was NaN.")
-            raise ValueError
-        print("Assigning confidence value.")
-        confidence = True
-        if sum_weights/ len(data)< 0.7:
-            confidence=False
-        speed_data.append( (indv,speed,confidence) )
-    
-    con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
-    cur = con.cursor()
-    intended_numIndv = cur.execute("SELECT numInd FROM videos WHERE vidMD5 = ?", [vidMD5]).fetchone()[0]
-    con.close()
-    if len(speed_data) == 0:
-        print(f"No speed data was found for {vidMD5}.")
-        raise ValueError
-    elif len(speed_data) == intended_numIndv:
-        mark_complete(vidMD5)
-    elif len(speed_data) in range(intended_numIndv-1,intended_numIndv+2):
-        mark_warning(vidMD5)
-    else:
-        mark_error(vidMD5)
-
-    con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
-    cur = con.cursor()
-    for v in speed_data:
-        indv,speed,confidence,_ = v
-        cur.execute("INSERT OR REPLACE INTO detectedIndv(vidMD5, ind, speed, confidence) VALUES(?,?,?,?)",
-                    [vidMD5,indv,speed,confidence])
-    con.commit()
-    con.close()
-    """
 
     # Find FPS and Step Size
     video_path = os.path.abspath(f"../data/ingest/videos/{vidMD5}.mp4")
@@ -267,76 +215,77 @@ def track_data_processing(vidMD5):
 
             seg_len = indv_lens[indv] / (len(SKELETON)-1)
 
-            for bodypart_index in range(1, len(SKELETON)-1): # Ignore ends of the worms
-                bodypart =  SKELETON[bodypart_index]
-                bodypart_pred =  SKELETON[bodypart_index-1]
+
+            bodypart =  SKELETON[1]
+            bodypart_pred =  SKELETON[0]
+            confidence = 0
+
+            x_pos_prev = np.NaN
+            y_pos_prev = np.NaN
+            prev_q = memCur.execute('SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
+            if prev_q is not None and None not in prev_q:
+                x_pos_prev = prev_q[0]
+                y_pos_prev = prev_q[1]
+                confidence += prev_q[2] / 2
+
+            x_pos_now = np.NaN
+            y_pos_now = np.NaN
+            now_q = memCur.execute('SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind, indv, bodypart) ).fetchone()
+            if now_q is not None and None not in now_q:
+                x_pos_now = now_q[0]
+                y_pos_now = now_q[1]
+                confidence += now_q[2] / 2
+
+            x_pos_pred_prev = np.NaN
+            y_pos_pred_prev = np.NaN
+            pred_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart_pred) ).fetchone()
+            if pred_q is not None and None not in pred_q:
+                x_pos_pred_prev = pred_q[0]
+                y_pos_pred_prev = pred_q[1]
+
+            if np.count_nonzero(np.isnan([x_pos_prev, y_pos_prev, x_pos_now, y_pos_now, x_pos_pred_prev, y_pos_pred_prev])):
+                distance = np.NaN
                 confidence = 0
 
-                x_pos_prev = np.NaN
-                y_pos_prev = np.NaN
-                prev_q = memCur.execute('SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart) ).fetchone()
-                if prev_q is not None:
-                    x_pos_prev = prev_q[0]
-                    y_pos_prev = prev_q[1]
-                    confidence += prev_q[2] / 2
+            shadow_parts_q = memCur.execute('SELECT indiv FROM labels WHERE frame_num = ? AND indiv < ? AND bodypart = ? '+
+                                                    'AND x_pos between ? and ? AND y_pos between ? and ?',
+                                                    (frame_ind-step_size, indv, bodypart,
+                                                    x_pos_now-0.5*seg_len,x_pos_now+0.5*seg_len, y_pos_now-0.5*seg_len,y_pos_now+0.5*seg_len  )
+                                                    ).fetchall()
+            if len(shadow_parts_q) > 0:
+                distance = np.NaN
+                confidence = 0
 
-                x_pos_now = np.NaN
-                y_pos_now = np.NaN
-                now_q = memCur.execute('SELECT x_pos, y_pos, confidence FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind, indv, bodypart) ).fetchone()
-                if now_q is not None:
-                    x_pos_now = now_q[0]
-                    y_pos_now = now_q[1]
-                    confidence += now_q[2] / 2
-                
-                x_pos_pred_prev = np.NaN
-                y_pos_pred_prev = np.NaN
-                pred_q = memCur.execute('SELECT x_pos, y_pos FROM labels WHERE frame_num = ? AND indiv = ? AND bodypart = ?', (frame_ind-step_size, indv, bodypart_pred) ).fetchone()
-                if now_q is not None:
-                    x_pos_pred_prev = pred_q[0]
-                    y_pos_pred_prev = pred_q[1]
+            pos_prev = np.array( [x_pos_prev, y_pos_prev] )
+            pos_now = np.array( [x_pos_now, y_pos_now] )
+            pos_pred_prev = np.array( [x_pos_pred_prev, y_pos_pred_prev] )
 
-                if None in [x_pos_prev, y_pos_prev, x_pos_now, y_pos_now, x_pos_pred_prev, y_pos_pred_prev]:
-                    distance = np.NaN
-                    confidence = 0
+            distance = np.linalg.norm(pos_now-pos_prev)
 
-                shadow_parts_q = memCur.execute('SELECT indiv FROM labels WHERE frame_num = ? AND indiv < ? AND bodypart = ? '+
-                                                        'AND x_pos between ? and ? AND y_pos between ? and ?', 
-                                                        (frame_ind-step_size, indv, bodypart, 
-                                                        x_pos_now-0.5*seg_len,x_pos_now+0.5*seg_len, y_pos_now-0.5*seg_len,y_pos_now+0.5*seg_len  ) 
-                                                        ).fetchall()
-                if len(shadow_parts_q) > 0: 
-                    distance = np.NaN
-                    confidence = 0
-                    
-                pos_prev = np.array( [x_pos_prev, y_pos_prev] )
-                pos_now = np.array( [x_pos_now, y_pos_now] )
-                pos_pred_prev = np.array( [x_pos_pred_prev, y_pos_pred_prev] )
-                
-                distance = np.linalg.norm(pos_now-pos_prev)
+            if np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now) ) < 0:
+                distance *= -1
+                confidence = 0
 
-                if np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now) ) < 0:
-                    distance *= -1
-                
-                if distance > seg_len*2:
-                    distance = np.NaN
-                    confidence = 0
-                
-                speed_data[indv].append([distance, confidence])
-                if confidence > 0:
-                    if bodypart == SKELETON[1]:
-                        cv2.circle(frame, (int(x_pos_now),int(y_pos_now)), 16, (0, 94, 213), -1)
-                    else:
-                        cv2.circle(frame, (int(x_pos_now),int(y_pos_now)), 16, (115, 158, 0), -1)
-                    cv2.line(frame, (int(x_pos_now),int(y_pos_now)), (int(x_pos_prev),int(y_pos_prev)), (115, 158, 0), 4)
-                elif None not in [x_pos_now, y_pos_now]:
-                    cv2.circle(frame, (int(x_pos_now),int(y_pos_now)), 16, (0,255,255), -1)
-                    if None not in [x_pos_prev, y_pos_prev]:
-                        cv2.line(frame, (int(x_pos_now),int(y_pos_now)), (int(x_pos_prev),int(y_pos_prev)), (0,255,255), 4)
+            if abs(distance) > seg_len*1.5:
+                distance = np.NaN
+                confidence = 0
+
+            speed_data[indv].append([distance, confidence])
+            if confidence > 0:
+                if bodypart == SKELETON[1]:
+                    cv2.circle(frame, (int(x_pos_now),int(y_pos_now)), 16, (0, 94, 213), -1)
+                else:
+                    cv2.circle(frame, (int(x_pos_now),int(y_pos_now)), 16, (115, 158, 0), -1)
+                cv2.line(frame, (int(x_pos_now),int(y_pos_now)), (int(x_pos_prev),int(y_pos_prev)), (115, 158, 0), 4)
+            elif None not in [x_pos_now, y_pos_now]:
+                cv2.circle(frame, (int(x_pos_now),int(y_pos_now)), 16, (0,255,255), -1)
+                if not np.count_nonzero(np.isnan([x_pos_prev, y_pos_prev])):
+                    cv2.line(frame, (int(x_pos_now),int(y_pos_now)), (int(x_pos_prev),int(y_pos_prev)), (0,255,255), 4)
         out_video.write(frame)
     src_video.release()
     out_video.release()
 
-
+    speed_res = []
     for indv in [f"ind{i}" for i in range(1,numInd+1)]:
         print(f"Calculating speed of {indv} for {vidMD5}")
         weighted_avg_distance = 0
@@ -347,20 +296,17 @@ def track_data_processing(vidMD5):
                 sum_weights += p
         print(f"Calculating speed of {indv} for {vidMD5}")
         if sum_weights == 0:
-            print(f"The longest tracklet of {indv} for {vidMD5} was empty.")
             raise ValueError
         speed = (weighted_avg_distance/sum_weights) /step_size*fps
-        print("Testing speed is a valid value.")
         if np.isnan(speed):
             print(f"The speed of {indv} for {vidMD5} was NaN.")
             raise ValueError
-        print("Assigning confidence value.")
 
+        print("Assigning confidence value.")
         confidence = True
-        if sum_weights/ len(data)< 0.7:
+        if sum_weights/ len(speed_data[indv])< 0.7:
             confidence=False
         
-        speed_res.append( (indv,speed,confidence) )
         speed_res.append( (indv,speed,confidence) )
     
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
@@ -371,7 +317,7 @@ def track_data_processing(vidMD5):
         print(f"No speed data was found for {vidMD5}.")
         raise ValueError
     elif len(speed_res) == intended_numIndv:
-        speed_res(vidMD5)
+        mark_complete(vidMD5)
     elif len(speed_data) in range(intended_numIndv-1,intended_numIndv+2):
         mark_warning(vidMD5)
     else:
@@ -379,8 +325,8 @@ def track_data_processing(vidMD5):
 
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
-    for v in speed_data:
-        indv,speed,confidence,_ = v
+    for v in speed_res:
+        indv,speed,confidence = v
         cur.execute("INSERT OR REPLACE INTO detectedIndv(vidMD5, ind, speed, confidence) VALUES(?,?,?,?)",
                     [vidMD5,indv,speed,confidence])
     con.commit()
@@ -428,39 +374,34 @@ def core_loop(_):
     while True:
         vidMD5, numInd = acquire_video_job()
         print(f'Found job: {vidMD5}')
-        try:
-            for attempt in range(4):
+        for i in range(4):
+            if i == 0:
                 try:
-                    if attempt == 0:
-                        dlc_track_data_generation(vidMD5, numInd)
-                    elif attempt == 1:
-                        if numInd - 1 < 1:
-                            raise ValueError
-                        dlc_track_data_generation(vidMD5, numInd-1)
-                    elif attempt == 2:
-                        dlc_track_data_generation(vidMD5, numInd+1)
-                    elif attempt == 3:
-                        dlc_track_data_generation(vidMD5, None)
-                    
+                    dlc_track_data_generation(vidMD5, numInd)
                     track_data_processing(vidMD5)
-                except ValueError as e:
-                    print(f"detector failed, {e}")
+                    break
+                except ValueError:
                     cleanup(vidMD5)
-                    if attempt == 2:
-                        mark_failed(vidMD5)
-                        raise ValueError
-                except OSError as e:
-                    mark_failed(vidMD5)
-                    print(f"detector failed, {e}")
+            elif i == 1 and numInd - 1 > 0:
+                try:
+                    dlc_track_data_generation(vidMD5, numInd-1)
+                    track_data_processing(vidMD5)
+                    break
+                except ValueError:
                     cleanup(vidMD5)
-                    if attempt == 2:
-                        mark_failed(vidMD5)
-                        raise ValueError
-        except ValueError:
-            mark_failed(vidMD5)
-        cleanup(vidMD5)
+            elif i == 2:
+                try:
+                    dlc_track_data_generation(vidMD5, numInd+1)
+                    track_data_processing(vidMD5)
+                    break
+                except ValueError:
+                    cleanup(vidMD5)
+            else:
+                mark_error(vidMD5)
+                cleanup(vidMD5)
 
         
 if __name__ == '__main__':
+    print("Initialized")
     with Pool(4) as mp:
         mp.map(core_loop, range(4))
