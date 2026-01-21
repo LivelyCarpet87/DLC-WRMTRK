@@ -308,7 +308,9 @@ def track_data_processing(vidMD5):
         confidence_vals = np.array(speed_data[indv])[:,1]
         #if sum_weights/ len(speed_data[indv])< 0.7:
         #    confidence=False
-        if np.count_nonzero(confidence_vals) < len(speed_data[indv]) * 0.7:
+        if np.count_nonzero(confidence_vals) < (max_frame-min_frame-step_size) * 0.45:
+            continue
+        elif np.count_nonzero(confidence_vals) < (max_frame-min_frame-step_size) * 0.7:
             confidence=False
         
         speed_res.append( (indv,speed,confidence) )
