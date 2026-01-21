@@ -11,7 +11,7 @@ torch.backends.nnpack.enabled = False
 
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
-SHUFFLE=3
+SHUFFLE=4
 DLC_CFG_PATH = os.path.abspath("/home/livelycarpet87/Documents/DLC-WrmTrk-Tyllis Xu-2025-10-25/config.yaml")
 STEP_TIME = 0.1
 SKELETON= ['pharynx-tip', 'pharynx-end', '1/4-point', '3/8-point', 'midpoint', '5/8-point', '3/4-point', '7/8-point', 'tail-tip']
@@ -264,7 +264,8 @@ def track_data_processing(vidMD5):
 
             if np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now) ) < 0:
                 distance *= -1
-                confidence = 0
+                if abs(distance) > seg_len*0.125:
+                    confidence = 0
 
             if abs(distance) > seg_len*1.5:
                 distance = np.NaN
@@ -304,7 +305,10 @@ def track_data_processing(vidMD5):
 
         print("Assigning confidence value.")
         confidence = True
-        if sum_weights/ len(speed_data[indv])< 0.7:
+        confidence_vals = np.array(speed_data[indv])[:,1]
+        #if sum_weights/ len(speed_data[indv])< 0.7:
+        #    confidence=False
+        if np.count_nonzero(confidence_vals) < len(speed_data[indv]) * 0.7:
             confidence=False
         
         speed_res.append( (indv,speed,confidence) )
