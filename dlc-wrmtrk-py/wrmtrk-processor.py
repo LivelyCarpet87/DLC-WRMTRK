@@ -388,6 +388,10 @@ def core_loop(_):
                     break
                 except ValueError:
                     cleanup(vidMD5)
+                except OSError:
+                    mark_error(vidMD5)
+                    cleanup(vidMD5)
+                    break
             elif i == 1 and numInd - 1 > 0:
                 try:
                     dlc_track_data_generation(vidMD5, numInd-1)
@@ -395,6 +399,10 @@ def core_loop(_):
                     break
                 except ValueError:
                     cleanup(vidMD5)
+                except OSError:
+                    mark_error(vidMD5)
+                    cleanup(vidMD5)
+                    break
             elif i == 2:
                 try:
                     dlc_track_data_generation(vidMD5, numInd+1)
@@ -402,6 +410,10 @@ def core_loop(_):
                     break
                 except ValueError:
                     cleanup(vidMD5)
+                except OSError:
+                    mark_error(vidMD5)
+                    cleanup(vidMD5)
+                    break
             else:
                 mark_error(vidMD5)
                 cleanup(vidMD5)
