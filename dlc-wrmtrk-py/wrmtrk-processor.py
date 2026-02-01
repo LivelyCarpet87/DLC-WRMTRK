@@ -383,14 +383,14 @@ def mark_complete(vidMD5):
 def mark_warning(vidMD5, blame):
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
-    cur.execute("UPDATE videos SET proc_state = 'warning: '+? WHERE vidMD5 = ?", [blame, vidMD5])
+    cur.execute("UPDATE videos SET proc_state = 'warning: ' || ? WHERE vidMD5 = ?", [blame, vidMD5])
     con.commit()
     con.close()
 
 def mark_failed(vidMD5, blame):
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
-    cur.execute("UPDATE videos SET proc_state = 'failed: '+? WHERE vidMD5 = ?", [blame,vidMD5])
+    cur.execute("UPDATE videos SET proc_state = 'failed: ' || ? WHERE vidMD5 = ?", [blame,vidMD5])
     con.commit()
     con.close()
 
