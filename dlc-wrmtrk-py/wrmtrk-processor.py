@@ -11,11 +11,11 @@ torch.backends.nnpack.enabled = False
 
 DB_PATH = '../data/server.db'
 SQLITE3_TIMEOUT = 20
-SHUFFLE=4
-DLC_CFG_PATH = os.path.abspath("/home/livelycarpet87/Documents/DLC-WrmTrk-Tyllis Xu-2025-10-25/config.yaml")
+SHUFFLE=5
+DLC_CFG_PATH = os.path.abspath("/home/biosci/Documents/DLC-WrmTrk-Tyllis Xu-2025-10-25/config.yaml")
 STEP_TIME = 0.1
 SKELETON= ['pharynx-tip', 'pharynx-end', '1/4-point', '3/8-point', 'midpoint', '5/8-point', '3/4-point', '7/8-point', 'tail-tip']
-TRACK_METHOD = 'box'
+TRACK_METHOD = 'skeleton'
 
 con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
 cur = con.cursor()
@@ -201,14 +201,40 @@ def track_data_processing(vidMD5):
                                 fps / step_size, 
                                 (int(src_video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(src_video.get(cv2.CAP_PROP_FRAME_HEIGHT))))
     
+    if fps*STEP_TIME < 1:
+        mark_failed(vidMD5, "frame rate")
+        return
+    elif src_video.get(cv2.CAP_PROP_FRAME_COUNT) / fps < 8:
+        mark_failed(vidMD5, "too short")
+        return
+    
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    edge_range = min(frame_width, frame_height) * 0.05
+
+    blame = {
+        "backwards movement": 0,
+        "entry exit": 0,
+        "cicling": 0,
+        "detection failed": 0,
+    }
+
     for frame_ind in range(min_frame+step_size,max_frame+1, 1):
         src_video.set(cv2.CAP_PROP_POS_FRAMES, frame_ind)
         ret, frame = src_video.read()
         for indv in [f"ind{i}" for i in range(1,numInd+1)]:
+            if indv not in indv_lens:
+                continue
             x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             if x0 is None or y0 is None or x1 is None or y1 is None:
-                print("Box boundaries had NoneType", x0,y0,x1,y1)
+                blame['detection failed'] += 1
+                continue
+            elif x0 < edge_range or y0 < edge_range or x1 > frame_width-edge_range or y1 > frame_height-edge_range:
+                blame['entry exit'] += 1
+                continue
+            elif (x1-x0) < 2.5*seg_len and (y1-y0) < 2.5*seg_len:
+                blame["cicling"] += 1
                 continue
             cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (115, 158, 0), 4)
             cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 2, (115, 158, 0), 4, cv2.LINE_AA)
@@ -265,10 +291,12 @@ def track_data_processing(vidMD5):
             if np.dot( (pos_now-pos_prev), (pos_pred_prev-pos_now) ) < 0:
                 distance *= -1
                 if abs(distance) > seg_len*0.125:
+                    blame['backwards movement'] += 1
                     confidence = 0
 
             if abs(distance) > seg_len*1.5:
                 distance = np.NaN
+                blame['detection failed'] += 1
                 confidence = 0
 
             speed_data[indv].append([distance, confidence])
@@ -288,6 +316,8 @@ def track_data_processing(vidMD5):
 
     speed_res = []
     for indv in [f"ind{i}" for i in range(1,numInd+1)]:
+        if indv not in speed_data:
+            continue
         print(f"Calculating speed of {indv} for {vidMD5}")
         weighted_avg_distance = 0
         sum_weights = 0
@@ -306,8 +336,8 @@ def track_data_processing(vidMD5):
         print("Assigning confidence value.")
         confidence = True
         confidence_vals = np.array(speed_data[indv])[:,1]
-        #if sum_weights/ len(speed_data[indv])< 0.7:
-        #    confidence=False
+        if sum_weights/ len(speed_data[indv])< 0.5:
+            confidence=False
         if np.count_nonzero(confidence_vals) < (max_frame-min_frame-step_size) * 0.45:
             continue
         elif np.count_nonzero(confidence_vals) < (max_frame-min_frame-step_size) * 0.7:
@@ -322,12 +352,16 @@ def track_data_processing(vidMD5):
     if len(speed_res) == 0:
         print(f"No speed data was found for {vidMD5}.")
         raise ValueError
+    elif not np.all(np.array(speed_res)[:, 2].astype(bool)):
+        blame_target = max(blame, key=blame.get)
+        mark_warning(vidMD5, blame_target)
     elif len(speed_res) == intended_numIndv:
         mark_complete(vidMD5)
     elif len(speed_data) in range(intended_numIndv-1,intended_numIndv+2):
-        mark_warning(vidMD5)
+        mark_warning(vidMD5, "incorrect count")
     else:
-        mark_error(vidMD5)
+        blame_target = max(blame, key=blame.get)
+        mark_failed(vidMD5, blame_target)
 
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
@@ -346,24 +380,17 @@ def mark_complete(vidMD5):
     con.commit()
     con.close()
 
-def mark_warning(vidMD5):
+def mark_warning(vidMD5, blame):
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
-    cur.execute("UPDATE videos SET proc_state = 'warning' WHERE vidMD5 = ?", [vidMD5])
+    cur.execute("UPDATE videos SET proc_state = 'warning: '+? WHERE vidMD5 = ?", [blame, vidMD5])
     con.commit()
     con.close()
 
-def mark_error(vidMD5):
+def mark_failed(vidMD5, blame):
     con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
     cur = con.cursor()
-    cur.execute("UPDATE videos SET proc_state = 'error' WHERE vidMD5 = ?", [vidMD5])
-    con.commit()
-    con.close()
-
-def mark_failed(vidMD5):
-    con = sqlite3.connect(DB_PATH, timeout=SQLITE3_TIMEOUT)
-    cur = con.cursor()
-    cur.execute("UPDATE videos SET proc_state = 'failed' WHERE vidMD5 = ?", [vidMD5])
+    cur.execute("UPDATE videos SET proc_state = 'failed: '+? WHERE vidMD5 = ?", [blame,vidMD5])
     con.commit()
     con.close()
 
@@ -389,7 +416,11 @@ def core_loop(_):
                 except ValueError:
                     cleanup(vidMD5)
                 except OSError:
-                    mark_error(vidMD5)
+                    mark_failed(vidMD5, "detector crashed")
+                    cleanup(vidMD5)
+                    break
+                except OverflowError:
+                    mark_failed(vidMD5, "detector crashed")
                     cleanup(vidMD5)
                     break
             elif i == 1 and numInd - 1 > 0:
@@ -400,7 +431,11 @@ def core_loop(_):
                 except ValueError:
                     cleanup(vidMD5)
                 except OSError:
-                    mark_error(vidMD5)
+                    mark_failed(vidMD5, "detector crashed")
+                    cleanup(vidMD5)
+                    break
+                except OverflowError:
+                    mark_failed(vidMD5, "detector crashed")
                     cleanup(vidMD5)
                     break
             elif i == 2:
@@ -411,15 +446,19 @@ def core_loop(_):
                 except ValueError:
                     cleanup(vidMD5)
                 except OSError:
-                    mark_error(vidMD5)
+                    mark_failed(vidMD5, "detector crashed")
+                    cleanup(vidMD5)
+                    break
+                except OverflowError:
+                    mark_failed(vidMD5, "detector crashed")
                     cleanup(vidMD5)
                     break
             else:
-                mark_error(vidMD5)
+                mark_failed(vidMD5, "detector failed")
                 cleanup(vidMD5)
 
         
 if __name__ == '__main__':
     print("Initialized")
-    with Pool(4) as mp:
-        mp.map(core_loop, range(4))
+    with Pool(6) as mp:
+        mp.map(core_loop, range(6))
