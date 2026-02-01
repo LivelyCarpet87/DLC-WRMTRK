@@ -352,7 +352,7 @@ def track_data_processing(vidMD5):
     if len(speed_res) == 0:
         print(f"No speed data was found for {vidMD5}.")
         raise ValueError
-    elif not np.all(np.array(speed_res)[:, 2].astype(bool)):
+    elif not all(row[2] for row in speed_res):
         blame_target = max(blame, key=blame.get)
         mark_warning(vidMD5, blame_target)
     elif len(speed_res) == intended_numIndv:
