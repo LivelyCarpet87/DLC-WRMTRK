@@ -197,7 +197,7 @@ def track_data_processing(vidMD5):
 
     # Make labeled video
     out_video = cv2.VideoWriter(f'../data/outputs/{vidMD5}_labeled.mp4', 
-                                cv2.VideoWriter_fourcc(*'mp4v'), 
+                                cv2.VideoWriter_fourcc(*'avc1'), 
                                 fps / step_size, 
                                 (int(src_video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(src_video.get(cv2.CAP_PROP_FRAME_HEIGHT))))
     
