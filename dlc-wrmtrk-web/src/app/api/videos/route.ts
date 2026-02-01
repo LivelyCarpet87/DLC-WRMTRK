@@ -58,7 +58,8 @@ export async function POST(request: Request) {
 
             data = {
                 tsv: tsv,
-                labeled_download: `/api/videos/${videoMD5}_labeled.mp4`,
+                labeled_download: `/api/videos/labeled/${videoMD5}_labeled.mp4`,
+                raw_download: `/api/videos/raw/${videoMD5}.mp4`,
                 table: table
             };
     }
