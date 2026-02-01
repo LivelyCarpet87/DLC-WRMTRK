@@ -208,8 +208,8 @@ def track_data_processing(vidMD5):
         mark_failed(vidMD5, "too short")
         return
     
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frame_width = int(src_video.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(src_video.get(cv2.CAP_PROP_FRAME_HEIGHT))
     edge_range = min(frame_width, frame_height) * 0.05
 
     blame = {
