@@ -141,7 +141,7 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
     return (
         <div className="border-2 border-slate-300 rounded-md p-3 flex flex-col gap-2 w-104">
             <div className="flex flex-row gap-2 items-center">
-                <Button onClick={()=>window.open(videoSWR.data.displayData!.raw_download)}>
+                <Button unstyled className="flex justify-start w-full p-0 text-inherit" onClick={()=>window.open(videoSWR.data.displayData!.raw_download)}>
                     <p className="text-ellipsis w-90">{videoSWR.data.filename}</p>
                 </Button>
                 {proc_indicator}
