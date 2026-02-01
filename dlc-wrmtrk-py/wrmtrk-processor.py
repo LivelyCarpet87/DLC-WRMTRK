@@ -225,6 +225,7 @@ def track_data_processing(vidMD5):
         for indv in [f"ind{i}" for i in range(1,numInd+1)]:
             if indv not in indv_lens:
                 continue
+            seg_len = indv_lens[indv] / (len(SKELETON)-1)
             x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             if x0 is None or y0 is None or x1 is None or y1 is None:
@@ -239,7 +240,6 @@ def track_data_processing(vidMD5):
             cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (115, 158, 0), 4)
             cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 2, (115, 158, 0), 4, cv2.LINE_AA)
 
-            seg_len = indv_lens[indv] / (len(SKELETON)-1)
 
 
             bodypart =  SKELETON[1]
