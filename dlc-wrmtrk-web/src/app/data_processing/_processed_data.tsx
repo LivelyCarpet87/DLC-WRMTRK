@@ -24,7 +24,7 @@ const VideoTile = memo(function VideoTile({md5}:{md5:string}){
     
     const proc_state = videoSWR.data?.proc_state;
     useEffect(() => {
-        if (proc_state === "done" || proc_state.includes("warning") || proc_state.includes("failed")) {
+        if (proc_state === "done" || proc_state?.includes("warning") || proc_state?.includes("failed")) {
             pauseRef.current = true;
         }
     }, [proc_state]);
