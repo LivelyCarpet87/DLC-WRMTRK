@@ -77,6 +77,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
   const [conditions, setConditions] = useState([] as string[]);
   const [warnMsg, setWarnMsg] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
@@ -198,7 +199,8 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
     } else {
         console.log("Plate submission failed.", body);
     }
-    setUploading(false)
+    setUploading(false);
+    setUploaded(true);
 
   }
 
@@ -252,7 +254,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
 
       <div className="grid grid-cols-2 gap-4">
         <Tooltip label="Can resubmit to update information." openDelay={700}>
-          <Button className="bg-green-700" onClick={submitPlate} disabled={uploading}>
+          <Button className="bg-green-700" onClick={submitPlate} disabled={uploading || uploaded}>
             Submit For Processing
           </Button>
         </Tooltip>
