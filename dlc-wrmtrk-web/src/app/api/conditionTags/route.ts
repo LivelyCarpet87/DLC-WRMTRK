@@ -22,7 +22,11 @@ export async function POST(request: Request) {
     const conditionTagsAdd = (new Set(newConditionTagPool) as Set<string>).difference(new Set(existingConditionTags)) as Set<string>;
 
 
-    conditionTagsRm.forEach(label => db.prepare('DELETE FROM conditionTagPool WHERE conditionTag = ?').run(label));
+    conditionTagsRm.forEach(label => db.prepare(`DELETE FROM conditionTagPool WHERE conditionTag = ? AND NOT EXISTS (
+      SELECT 1
+      FROM conditions
+      WHERE conditions.condTag = conditionTagPool.conditionTag
+    )`).run(label));
     conditionTagsAdd.forEach(label => db.prepare('INSERT INTO conditionTagPool(conditionTag) VALUES(?)').run(label));
     
     return new Response(JSON.stringify("OK"), {

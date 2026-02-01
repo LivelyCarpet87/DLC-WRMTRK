@@ -22,7 +22,11 @@ export async function POST(request: Request) {
     const secondaryLabelsAdd = (new Set(newSecondaryLabelPool) as Set<string>).difference(new Set(existingSecondaryLabels)) as Set<string>;
 
 
-    secondaryLabelsRm.forEach(label => db.prepare('DELETE FROM secondaryLabelPool WHERE secondaryLabel = ?').run(label));
+    secondaryLabelsRm.forEach(label => db.prepare(`DELETE FROM secondaryLabelPool WHERE secondaryLabel = ? AND NOT EXISTS (
+      SELECT 1
+      FROM plates
+      WHERE plates.secondaryLabel = secondaryLabelPool.secondaryLabel
+    )`).run(label));
     secondaryLabelsAdd.forEach(label => db.prepare('INSERT INTO secondaryLabelPool(secondaryLabel) VALUES(?)').run(label));
     
     return new Response(JSON.stringify("OK"), {
