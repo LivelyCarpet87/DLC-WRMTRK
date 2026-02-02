@@ -5,6 +5,7 @@ import deeplabcut as dlc
 import numpy as np
 import cv2
 import torch
+import ffmpeg
 from multiprocessing import Pool
 
 torch.backends.nnpack.enabled = False
@@ -197,7 +198,7 @@ def track_data_processing(vidMD5):
 
     # Make labeled video
     out_video = cv2.VideoWriter(f'../data/outputs/{vidMD5}_labeled.mp4', 
-                                cv2.VideoWriter_fourcc(*'H264'), 
+                                cv2.VideoWriter_fourcc(*'mp4v'), 
                                 fps / step_size, 
                                 (int(src_video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(src_video.get(cv2.CAP_PROP_FRAME_HEIGHT))))
     
@@ -313,6 +314,13 @@ def track_data_processing(vidMD5):
         out_video.write(frame)
     src_video.release()
     out_video.release()
+    (
+        ffmpeg
+        .input('../data/outputs/{vidMD5}_labeled.mp4')
+        .output('../data/outputs/{vidMD5}_labeled_h264.mp4', vcodec='libx264', crf=23, preset='fast', pix_fmt='yuv420p')
+        .run(overwrite_output=True)
+    )
+    os.replace('../data/outputs/{vidMD5}_labeled_h264.mp4', '../data/outputs/{vidMD5}_labeled.mp4')
 
     speed_res = []
     for indv in [f"ind{i}" for i in range(1,numInd+1)]:
