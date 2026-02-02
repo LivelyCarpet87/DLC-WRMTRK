@@ -316,8 +316,8 @@ def track_data_processing(vidMD5):
     out_video.release()
     (
         ffmpeg
-        .input('../data/outputs/{vidMD5}_labeled.mp4')
-        .output('../data/outputs/{vidMD5}_labeled_h264.mp4', vcodec='libx264', crf=23, preset='fast', pix_fmt='yuv420p')
+        .input(f'../data/outputs/{vidMD5}_labeled.mp4')
+        .output(f'../data/outputs/{vidMD5}_labeled_h264.mp4', vcodec='libx264', crf=23, preset='fast', pix_fmt='yuv420p')
         .run(overwrite_output=True)
     )
     os.replace('../data/outputs/{vidMD5}_labeled_h264.mp4', '../data/outputs/{vidMD5}_labeled.mp4')
