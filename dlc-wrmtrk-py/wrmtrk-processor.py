@@ -216,8 +216,8 @@ def track_data_processing(vidMD5):
     blame = {
         "backwards movement": 0,
         "entry exit": 0,
-        "cicling": 0,
-        "detection failed": 0,
+        "circling": 0,
+        "unreliable detection": 0,
     }
 
     for frame_ind in range(min_frame+step_size,max_frame+1, 1):
@@ -230,13 +230,13 @@ def track_data_processing(vidMD5):
             x0,y0 = memCur.execute('SELECT MIN(x_pos), MIN(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             x1,y1 = memCur.execute('SELECT MAX(x_pos), MAX(y_pos) FROM labels WHERE frame_num = ? AND indiv = ?', [frame_ind, indv]).fetchone()
             if x0 is None or y0 is None or x1 is None or y1 is None:
-                blame['detection failed'] += 1
+                blame['unreliable detection'] += 1
                 continue
             elif x0 < edge_range or y0 < edge_range or x1 > frame_width-edge_range or y1 > frame_height-edge_range:
                 blame['entry exit'] += 1
                 continue
-            elif (x1-x0) < 2.5*seg_len and (y1-y0) < 2.5*seg_len:
-                blame["cicling"] += 1
+            elif (x1-x0) < 3*seg_len and (y1-y0) < 3*seg_len:
+                blame["circling"] += 1
                 continue
             cv2.rectangle(frame, (int(x0-20),int(y0-20)), (int(x1+20),int(y1+20)), (115, 158, 0), 4)
             cv2.putText(frame, indv, (int(x0-20),int(y0-25)), cv2.FONT_HERSHEY_SIMPLEX, 2, (115, 158, 0), 4, cv2.LINE_AA)
@@ -297,7 +297,7 @@ def track_data_processing(vidMD5):
 
             if abs(distance) > seg_len*1.5:
                 distance = np.NaN
-                blame['detection failed'] += 1
+                blame['unreliable detection'] += 1
                 confidence = 0
 
             speed_data[indv].append([distance, confidence])
@@ -462,7 +462,7 @@ def core_loop(_):
                     cleanup(vidMD5)
                     break
             else:
-                mark_failed(vidMD5, "detector failed")
+                mark_failed(vidMD5, "detector failed to find any invididuals")
                 cleanup(vidMD5)
 
         
