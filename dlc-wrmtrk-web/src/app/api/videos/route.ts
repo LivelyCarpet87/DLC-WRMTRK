@@ -59,7 +59,6 @@ export async function POST(request: Request) {
             data = {
                 tsv: tsv,
                 labeled_download: `/api/videos/labeled/${videoMD5}_labeled.mp4`,
-                raw_download: `/api/videos/raw/${videoMD5}.mp4`,
                 table: table
             };
     }
@@ -69,6 +68,8 @@ export async function POST(request: Request) {
             filename: filename,
             proc_state: proc_state,
             displayData: data,
+            raw_download: `/api/videos/raw/${videoMD5}.mp4`,
+
         }
     ), {
         status: 200,
