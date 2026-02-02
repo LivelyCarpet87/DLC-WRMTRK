@@ -361,6 +361,7 @@ def track_data_processing(vidMD5):
         print(f"No speed data was found for {vidMD5}.")
         raise ValueError
     elif not all(row[2] for row in speed_res):
+        blame["unreliable detection"] /= 2 # Underweight unreliable detections, because they are usually caused by other factors
         blame_target = max(blame, key=blame.get)
         mark_warning(vidMD5, blame_target)
     elif len(speed_res) == intended_numIndv:
@@ -368,6 +369,7 @@ def track_data_processing(vidMD5):
     elif len(speed_data) in range(intended_numIndv-1,intended_numIndv+2):
         mark_warning(vidMD5, "incorrect count")
     else:
+        blame["unreliable detection"] /= 2 # Underweight unreliable detections, because they are usually caused by other factors
         blame_target = max(blame, key=blame.get)
         mark_failed(vidMD5, blame_target)
 
