@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         const {filename, proc_state} = videoQ;
 
         let data = {};
-        if (proc_state == "done" || proc_state == "warning"){
+        if (proc_state == "done" || proc_state.includes("warning")){
             const dataQ = db.prepare('SELECT ind, speed, confidence FROM detectedIndv WHERE vidMD5 = ?').all(videoMD5);
             let tsv = "";
             const table = [] as {ind:string, speed:number, confidence:boolean}[]
