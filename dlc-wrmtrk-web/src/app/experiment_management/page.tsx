@@ -9,6 +9,16 @@ export default function ExperimentManagement() {
   const primaryLabelsSwr = useSWR(`/api/primaryLabels`, fetcher);
   const secondaryLabelsSwr = useSWR(`/api/secondaryLabels`, fetcher);
   const conditionTagsSwr = useSWR(`/api/conditionTags`, fetcher);
+  const heartbeatSwr = useSWR('/api/heartbeat', fetcher);
+
+  let heartbeatData:any = {
+    "pending": "Loading...",
+    "processing": "Loading...",
+  }
+  if (heartbeatSwr.data) {
+    console.log(heartbeatSwr.data)
+    heartbeatData = heartbeatSwr.data
+  }
 
   // const [primaryLabelsPool, setPrimaryLabelsPool] = useState<string[]>(primaryLabelsSwr.data ? primaryLabelsSwr.data : [] as string[]);
     async function setPrimaryLabelsPool(primaryLabelPool:string[]){
@@ -47,6 +57,11 @@ export default function ExperimentManagement() {
 
   return (
     <div className="flex flex-col gap-4 items-center justify-start">
+      <div className="bg-slate-100 rounded-md p-3 flex flex-col gap-3">
+        <p className="font-bold text-md text-start w-120">Video Processing Queue Status</p>
+        <p>Pending Videos: {heartbeatData['pending']}</p>
+        <p>Processing Videos: {heartbeatData['processing']}</p>
+      </div>
       <div className="bg-slate-100 rounded-md p-3 flex flex-col gap-3">
         <TagsInput label="Primary Labels (ENTER to add)" data={[]} value={primaryLabelsSwr.data} onChange={setPrimaryLabelsPool} className="w-120"/>
         <TagsInput label="Secondary Labels (ENTER to add)" data={[]} value={secondaryLabelsSwr.data} onChange={setSecondaryLabelsPool} className="w-120" />
