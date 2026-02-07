@@ -6,6 +6,7 @@ import useSWR, { Fetcher } from "swr";
 export default function ExperimentManagement() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const heartbeatFetcher: Fetcher<{pending: number, processing: number}> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
   const primaryLabelsSwr = useSWR(`/api/primaryLabels`, fetcher);
   const secondaryLabelsSwr = useSWR(`/api/secondaryLabels`, fetcher);
