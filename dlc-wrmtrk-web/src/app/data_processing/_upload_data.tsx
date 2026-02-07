@@ -13,7 +13,7 @@ import {
   Progress,
 } from "@mantine/core";
 import { UUID } from "node:crypto";
-import { MutableRefObject, useEffect, useState } from 'react';
+import { MutableRefObject, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import useSWR, { Fetcher } from 'swr';
 import { useFocusTrap, useHotkeys } from "@mantine/hooks";

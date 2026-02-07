@@ -6,18 +6,19 @@ import useSWR, { Fetcher } from "swr";
 export default function ExperimentManagement() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
+  const heartbeatFetcher: Fetcher<{pending: number, processing: number}> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
   const primaryLabelsSwr = useSWR(`/api/primaryLabels`, fetcher);
   const secondaryLabelsSwr = useSWR(`/api/secondaryLabels`, fetcher);
   const conditionTagsSwr = useSWR(`/api/conditionTags`, fetcher);
-  const heartbeatSwr = useSWR('/api/heartbeat', fetcher);
+  const heartbeatSwr = useSWR<{pending: number, processing: number}>('/api/heartbeat', heartbeatFetcher);
 
-  let heartbeatData:any = {
-    "pending": "Loading...",
-    "processing": "Loading...",
+  let heartbeatData:{pending: string|number, processing: string|number} = {
+    pending: "Loading...",
+    processing: "Loading...",
   }
   if (heartbeatSwr.data) {
     console.log(heartbeatSwr.data)
-    heartbeatData = heartbeatSwr.data
+    heartbeatData = heartbeatSwr.data;
   }
 
   // const [primaryLabelsPool, setPrimaryLabelsPool] = useState<string[]>(primaryLabelsSwr.data ? primaryLabelsSwr.data : [] as string[]);
