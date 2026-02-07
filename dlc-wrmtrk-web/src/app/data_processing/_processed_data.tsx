@@ -167,7 +167,7 @@ function PlateTile({uuid}:{uuid:UUID}){
         return (
         <div className="bg-slate-100 rounded-md p-3 flex flex-col gap-4 w-112">
             <div className="flex flex-row gap-4 w-104 items-center justify-between">
-                <p className="text-ellipsis w-50">PlateID: Loading...</p>
+                <p className="text-ellipsis w-50">Batch ID: Loading...</p>
                 <div className="flex flex-row gap-2 items-center">
                     Loading...
                 </div>

@@ -10,9 +10,10 @@ import {
   Divider,
   Notification,
   Tooltip,
+  Progress,
 } from "@mantine/core";
 import { UUID } from "node:crypto";
-import { MutableRefObject, useState } from 'react';
+import { MutableRefObject, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import useSWR, { Fetcher } from 'swr';
 import { useFocusTrap, useHotkeys } from "@mantine/hooks";
@@ -76,8 +77,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
   const [normImg, setNormImg] = useState(null as null|File);
   const [conditions, setConditions] = useState([] as string[]);
   const [warnMsg, setWarnMsg] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploaded, setUploaded] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(-1);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetcher: Fetcher<string[]> = (arg: any, ...args: any) => fetch(arg, ...args).then(res => res.json());
@@ -116,7 +116,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
       setWarnMsg('Secondary Label has not been provided. The plate was not submitted for processing.');
       return;
     } else if (plateID == ""){
-      setWarnMsg('Plate ID has not been provided. The plate was not submitted for processing.');
+      setWarnMsg('Batch ID has not been provided. The plate was not submitted for processing.');
       return;
     } else if (normImg == null){
       setWarnMsg('Normalizing Image has not been provided. The plate was not submitted for processing.');
@@ -172,7 +172,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
         body: plateFormData
     });
 
-    setUploading(true);
+    setUploadProgress(0);
     for (const ind in videoTiles) {
       const vid_uuid = videoTiles[ind];
       if (videos.get(vid_uuid) === undefined) {
@@ -196,12 +196,14 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
 
     if (body.status === 'ok') {
         submissionCounter.current += 1;
+        setUploadProgress(submissionCounter.current/videoTiles.length * 100);
     } else {
         console.log("Plate submission failed.", body);
     }
-    setUploading(false);
-    setUploaded(true);
-
+    setUploadProgress(100);
+    setTimeout(() => {
+        onDelete(uuid);
+    }, 15000);
   }
 
   const notifications = [] as React.JSX.Element[]
@@ -212,14 +214,44 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
       </Notification>
     )
   }
+
+  let uploadControl = <div></div>
+  if (uploadProgress == -1){
+      uploadControl = (
+        <div className="grid grid-cols-2 gap-4">
+          <Tooltip label="Upload videos and submit for processing." openDelay={700}>
+            <Button className="bg-green-700" onClick={submitPlate}>
+              Submit For Processing
+            </Button>
+          </Tooltip>
+          <Tooltip label="This does not delete submitted data." openDelay={700}>
+            <Button className="bg-red-700" onClick={() => onDelete(uuid) }>
+              Delete
+            </Button>
+          </Tooltip>
+        </div>)
+  } else if (uploadProgress >= 0 && uploadProgress < 100) {
+    uploadControl = (
+      <div>
+        <Progress size="lg" value={uploadProgress} color={'teal'} striped animated />
+        <p className="font-bold text-center" >Uploading videos... DO NOT CLOSE THIS TAB!</p>
+      </div>
+    )
+  } else {
+    uploadControl = (
+      <div>
+        <p className="font-bold text-center" >UPLOAD COMPLETE</p>
+      </div>
+    )
+  }
   
   return (
     <div className="bg-slate-100 rounded-md p-4 flex flex-col gap-4">
       <div className="flex flex-row gap-4">
         <TextInput
           className="w-40"
-          label="Plate ID"
-          placeholder="Plate ID"
+          label="Batch ID"
+          placeholder="Batch ID"
           value={plateID}
           onChange={(event) => setPlateID(event.currentTarget.value)}
           ref={useFocusTrap(plateID === "")}
@@ -252,18 +284,8 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
 
       {notifications}
 
-      <div className="grid grid-cols-2 gap-4">
-        <Tooltip label="Can resubmit to update information." openDelay={700}>
-          <Button className="bg-green-700" onClick={submitPlate} disabled={uploading || uploaded}>
-            Submit For Processing
-          </Button>
-        </Tooltip>
-        <Tooltip label="This does not delete submitted data." openDelay={700}>
-          <Button className="bg-red-700" onClick={() => onDelete(uuid) } disabled={uploading}>
-            Delete Plate Locally
-          </Button>
-        </Tooltip>
-      </div>
+      {uploadControl}
+      
     </div>
   )
 }
@@ -294,7 +316,7 @@ export function UploadData({primaryLabel, secondaryLabel, submissionCounter}:{pr
             )
           )}
 
-          <Tooltip label="Create another form for another plate. Hotkey: CTRL+K" openDelay={700}>
+          <Tooltip label="Create another form for another batch. Hotkey: CTRL+K" openDelay={700}>
             <Button variant="outline" onClick={addPlate} className="w-114">
               + Add Plate
             </Button>
