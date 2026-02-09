@@ -173,6 +173,7 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
     });
 
     setUploadProgress(0);
+    let uploadCount = 0;
     for (const ind in videoTiles) {
       const vid_uuid = videoTiles[ind];
       if (videos.get(vid_uuid) === undefined) {
@@ -190,13 +191,14 @@ function PlateTile({onDelete, uuid, primaryLabel, secondaryLabel, submissionCoun
           method: 'POST',
           body: formData
       });
+      uploadCount += 1;
+      setUploadProgress(uploadCount/videoTiles.length * 100);
     }
 
     const body = await plateSubmitResponse.json() as { status: 'ok' | 'fail', message: string };
 
     if (body.status === 'ok') {
         submissionCounter.current += 1;
-        setUploadProgress(submissionCounter.current/videoTiles.length * 100);
     } else {
         console.log("Plate submission failed.", body);
     }
